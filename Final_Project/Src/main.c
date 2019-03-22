@@ -20,20 +20,19 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "arm_math.h"
-#include "stm32l475e_iot01_qspi.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
-#define RX_BUFFER_SIZE 1000
-#define AUDIO_BUFFER_SIZE 1000
-#define TWO_PI_DIVIDED_BY_16000 0.00039269908
-
+#include "stm32l475e_iot01_qspi.h"
+#include "arm_math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+#define RX_BUFFER_SIZE 1000
+#define AUDIO_BUFFER_SIZE 1000
+#define TWO_PI_DIVIDED_BY_16000 0.00039269908
 
 /* USER CODE END PTD */
 
@@ -59,7 +58,8 @@ TIM_HandleTypeDef htim6;
 /* USER CODE BEGIN PV */
 
 char rxBuffer[RX_BUFFER_SIZE];
-uint16_t audioBuffer[AUDIO_BUFFER_SIZE];
+uint16_t audioBufferLeft[AUDIO_BUFFER_SIZE];
+uint16_t audioBufferRight[AUDIO_BUFFER_SIZE];
 int i;
 
 /* USER CODE END PV */
@@ -116,13 +116,15 @@ int main(void)
   MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 	
-	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1,(uint32_t*)audioBufferRight,AUDIO_BUFFER_SIZE_R, DAC_ALIGN_12B_R);
-	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2,(uint32_t*)audioBufferLeft,AUDIO_BUFFER_SIZE_L, DAC_ALIGN_12B_R);
-	
+	// start DMA transfer to DAC
+	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1,(uint32_t*)audioBufferRight,AUDIO_BUFFER_SIZE, DAC_ALIGN_12B_R);
+	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2,(uint32_t*)audioBufferLeft,AUDIO_BUFFER_SIZE, DAC_ALIGN_12B_R);
+
+
 	for(i=0;i<AUDIO_BUFFER_SIZE_R;i++) {
 		audioBufferRight[i] = arm_sin_f32(TWO_PI_DIVIDED_BY_16000*(i%16000)); // temp buffer storage before xfered to flash
 	}
-	
+
 	
 
   /* USER CODE END 2 */
