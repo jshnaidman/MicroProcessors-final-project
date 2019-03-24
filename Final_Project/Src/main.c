@@ -34,6 +34,8 @@
 #define BUFFER_SIZE 1000
 #define AUDIO_TWO_SECONDS 32000
 #define TWO_PI_DIVIDED_BY_16000 0.00039269908
+#define LEFT_BUFFER_START_INDEX (-1000)
+#define RIGHT_BUFFER_START_INDEX (AUDIO_TWO_SECONDS - 1000)
 
 /* USER CODE END PTD */
 
@@ -212,14 +214,14 @@ int main(void)
 	HAL_TIM_Base_Start(&htim6);
 	
 	BSP_QSPI_Init();
-	BSP_QSPI_Erase_Chip();
+	// BSP_QSPI_Erase_Chip(); // this can take like 30 seconds. 
 	
 	int a11 = 1;
-	int a12 = 1;
+	int a12 = 0;
 	int a21 = 1;
-	int a22 = 1;
+	int a22 = 0;
 	float32_t sinOne,sinTwo;
-	int angle1,angle2;
+	float32_t angle1,angle2;
 	
 	// create mixed signal and transfer over to flash
 	for(i=0;i<AUDIO_TWO_SECONDS;i++) {														
@@ -227,14 +229,14 @@ int main(void)
 		angle1 = TWO_PI_DIVIDED_BY_16000*((400*i)%16000);
 		angle2 = TWO_PI_DIVIDED_BY_16000*((700*i)%16000);
 		sinOne = arm_sin_f32(angle1);
-		sinOne = (sinOne+1)*2048;
+		sinOne = (sinOne+1)*2047;
 		sinTwo = arm_sin_f32(angle2);
-		sinTwo = (sinTwo+1)*2048;
-		audioBufferLeft[i] = (a11*sinOne + a12*sinTwo)/2;
-		audioBufferRight[i] = (a21*sinOne + a22*sinTwo)/2;
+		sinTwo = (sinTwo+1)*2047;
+		audioBufferLeft[i] = (uint16_t)((a11*sinOne + a12*sinTwo)/2 + 1);
+		audioBufferRight[i] = (uint16_t) ((a21*sinOne + a22*sinTwo)/2 + 1);
 		if (!(i%1000) && i) {
-			BSP_QSPI_Write((uint8_t*)audioBufferLeft,i,2*AUDIO_BUFFER_SIZE);
-			BSP_QSPI_Write((uint8_t*) audioBufferRight,AUDIO_TWO_SECONDS+i,2*AUDIO_BUFFER_SIZE);
+			BSP_QSPI_Write((uint8_t*)audioBufferLeft,LEFT_BUFFER_START_INDEX + i,2*AUDIO_BUFFER_SIZE);
+			BSP_QSPI_Write((uint8_t*) audioBufferRight,RIGHT_BUFFER_START_INDEX + i,2*AUDIO_BUFFER_SIZE);
 		}
 	}
 	
