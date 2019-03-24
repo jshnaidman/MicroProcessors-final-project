@@ -53,12 +53,19 @@
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+extern int rx_cplt;
+extern int tx_cplt;
+extern int cmd_cplt;
+
+
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
 extern DMA_HandleTypeDef hdma_dac_ch1;
 extern DMA_HandleTypeDef hdma_dac_ch2;
 extern DAC_HandleTypeDef hdac1;
+extern DMA_HandleTypeDef hdma_quadspi;
+extern QSPI_HandleTypeDef hqspi;
 extern TIM_HandleTypeDef htim6;
 /* USER CODE BEGIN EV */
 
@@ -229,6 +236,20 @@ void DMA1_Channel4_IRQHandler(void)
 }
 
 /**
+  * @brief This function handles DMA1 channel5 global interrupt.
+  */
+void DMA1_Channel5_IRQHandler(void)
+{
+  /* USER CODE BEGIN DMA1_Channel5_IRQn 0 */
+
+  /* USER CODE END DMA1_Channel5_IRQn 0 */
+  HAL_DMA_IRQHandler(&hdma_quadspi);
+  /* USER CODE BEGIN DMA1_Channel5_IRQn 1 */
+
+  /* USER CODE END DMA1_Channel5_IRQn 1 */
+}
+
+/**
   * @brief This function handles TIM6 global interrupt, DAC channel1 and channel2 underrun error interrupts.
   */
 void TIM6_DAC_IRQHandler(void)
@@ -243,9 +264,51 @@ void TIM6_DAC_IRQHandler(void)
   /* USER CODE END TIM6_DAC_IRQn 1 */
 }
 
+/**
+  * @brief This function handles QUADSPI global interrupt.
+  */
+void QUADSPI_IRQHandler(void)
+{
+  /* USER CODE BEGIN QUADSPI_IRQn 0 */
+
+  /* USER CODE END QUADSPI_IRQn 0 */
+  HAL_QSPI_IRQHandler(&hqspi);
+  /* USER CODE BEGIN QUADSPI_IRQn 1 */
+
+  /* USER CODE END QUADSPI_IRQn 1 */
+}
+
 /* USER CODE BEGIN 1 */
 
-void DAC_XFER_COMPLETE_CALLBACK
+/**
+  * @brief  Rx completed callbacks.
+  * @param  hqspi: QSPI handle
+  * @retval None
+  */
+void HAL_QSPI_RxCpltCallback(QSPI_HandleTypeDef *hqspi)
+{
+  rx_cplt = 1;
+}
+
+/**
+  * @brief  Command completed callbacks.
+  * @param  hqspi: QSPI handle
+  * @retval None
+  */
+void HAL_QSPI_CmdCpltCallback(QSPI_HandleTypeDef *hqspi)
+{
+  cmd_cplt = 1;
+}
+
+/**
+  * @brief  Tx Transfer completed callbacks.
+  * @param  hqspi: QSPI handle
+  * @retval None
+  */
+ void HAL_QSPI_TxCpltCallback(QSPI_HandleTypeDef *hqspi)
+{
+  tx_cplt = 1; 
+}
 
 /* USER CODE END 1 */
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

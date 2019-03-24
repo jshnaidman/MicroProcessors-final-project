@@ -32,6 +32,8 @@
 /* USER CODE BEGIN PTD */
 #define RX_BUFFER_SIZE 1000
 #define AUDIO_BUFFER_SIZE 1000
+#define BUFFER_SIZE 1000
+#define AUDIO_TWO_SECONDS 32000
 #define TWO_PI_DIVIDED_BY_16000 0.00039269908
 
 /* USER CODE END PTD */
@@ -52,6 +54,7 @@ DMA_HandleTypeDef hdma_dac_ch1;
 DMA_HandleTypeDef hdma_dac_ch2;
 
 QSPI_HandleTypeDef hqspi;
+DMA_HandleTypeDef hdma_quadspi;
 
 TIM_HandleTypeDef htim6;
 
@@ -61,6 +64,9 @@ char rxBuffer[RX_BUFFER_SIZE];
 uint16_t audioBufferLeft[AUDIO_BUFFER_SIZE];
 uint16_t audioBufferRight[AUDIO_BUFFER_SIZE];
 int i;
+int rx_cplt=1;
+int tx_cplt=1;
+int cmd_cplt=1;
 
 /* USER CODE END PV */
 
@@ -72,6 +78,90 @@ static void MX_DAC1_Init(void);
 static void MX_QUADSPI_Init(void);
 static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
+
+
+/**
+  * @brief  This function read the SR of the memory and wait the EOP.
+  * @param  hqspi   : QSPI handle
+  * @param  Timeout : Timeout for auto-polling
+  * @retval None
+  */
+uint8_t QSPI_AutoPollingMemReady(QSPI_HandleTypeDef *hqspi)
+{
+  QSPI_CommandTypeDef     sCommand;
+  QSPI_AutoPollingTypeDef sConfig;
+
+  /* Configure automatic polling mode to wait for memory ready */  
+  sCommand.InstructionMode   = QSPI_INSTRUCTION_1_LINE;
+  sCommand.Instruction       = READ_STATUS_REG_CMD;
+  sCommand.AddressMode       = QSPI_ADDRESS_NONE;
+  sCommand.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
+  sCommand.DataMode          = QSPI_DATA_1_LINE;
+  sCommand.DummyCycles       = 0;
+  sCommand.DdrMode           = QSPI_DDR_MODE_DISABLE;
+  sCommand.DdrHoldHalfCycle  = QSPI_DDR_HHC_ANALOG_DELAY;
+  sCommand.SIOOMode          = QSPI_SIOO_INST_EVERY_CMD;
+
+  sConfig.Match           = 0;
+  sConfig.Mask            = MX25R6435F_SR_WIP;
+  sConfig.MatchMode       = QSPI_MATCH_MODE_AND;
+  sConfig.StatusBytesSize = 1;
+  sConfig.Interval        = 0x10;
+  sConfig.AutomaticStop   = QSPI_AUTOMATIC_STOP_ENABLE;
+
+  if (HAL_QSPI_AutoPolling(hqspi, &sCommand, &sConfig, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+  {
+    return QSPI_ERROR;
+  }
+
+  return QSPI_OK;
+}
+
+
+/**
+  * @brief  This function send a Write Enable and wait it is effective.
+  * @param  hqspi : QSPI handle
+  * @retval None
+  */
+uint8_t QSPI_WriteEnable(QSPI_HandleTypeDef *hqspi)
+{
+  QSPI_CommandTypeDef     sCommand;
+  QSPI_AutoPollingTypeDef sConfig;
+
+  /* Enable write operations */
+  sCommand.InstructionMode   = QSPI_INSTRUCTION_1_LINE;
+  sCommand.Instruction       = WRITE_ENABLE_CMD;
+  sCommand.AddressMode       = QSPI_ADDRESS_NONE;
+  sCommand.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
+  sCommand.DataMode          = QSPI_DATA_NONE;
+  sCommand.DummyCycles       = 0;
+  sCommand.DdrMode           = QSPI_DDR_MODE_DISABLE;
+  sCommand.DdrHoldHalfCycle  = QSPI_DDR_HHC_ANALOG_DELAY;
+  sCommand.SIOOMode          = QSPI_SIOO_INST_EVERY_CMD;
+
+  if (HAL_QSPI_Command(hqspi, &sCommand, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+  {
+    return QSPI_ERROR;
+  }
+  
+  /* Configure automatic polling mode to wait for write enabling */  
+  sConfig.Match           = MX25R6435F_SR_WEL;
+  sConfig.Mask            = MX25R6435F_SR_WEL;
+  sConfig.MatchMode       = QSPI_MATCH_MODE_AND;
+  sConfig.StatusBytesSize = 1;
+  sConfig.Interval        = 0x10;
+  sConfig.AutomaticStop   = QSPI_AUTOMATIC_STOP_ENABLE;
+
+  sCommand.Instruction    = READ_STATUS_REG_CMD;
+  sCommand.DataMode       = QSPI_DATA_1_LINE;
+
+  if (HAL_QSPI_AutoPolling(hqspi, &sCommand, &sConfig, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+  {
+    return QSPI_ERROR;
+  }
+
+  return QSPI_OK;
+}
 
 /* USER CODE END PFP */
 
@@ -87,6 +177,8 @@ static void MX_TIM6_Init(void);
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+	QSPI_CommandTypeDef sCommand;
+	HAL_StatusTypeDef status;
 
   /* USER CODE END 1 */
 
@@ -106,6 +198,7 @@ int main(void)
 
   /* USER CODE BEGIN SysInit */
 
+
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -116,15 +209,99 @@ int main(void)
   MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 	
+	QSPI_WriteEnable(&hqspi); 
+	
+	// Erase the contents of the QSPI registers
+	sCommand.Instruction = SECTOR_ERASE_CMD;
+	sCommand.AddressMode = QSPI_ADDRESS_1_LINE;
+	sCommand.Address     = 0;
+	sCommand.DataMode    = QSPI_DATA_NONE;
+	sCommand.DummyCycles = 0;
+	
+	cmd_cplt=0;
+	if (HAL_QSPI_Command_IT(&hqspi, &sCommand) != HAL_OK)
+	{
+		Error_Handler();
+	}
+	
+	while(!cmd_cplt);
+	
+	QSPI_AutoPollingMemReady(&hqspi); // wait for the flash to be ready
+	
+	QSPI_WriteEnable(&hqspi); // the registers were wiped, need to re-enable the write
+	
+	/* Writing Sequence ------------------------------------------------ */
+	sCommand.Instruction = QUAD_PAGE_PROG_CMD;
+	sCommand.AddressMode = QSPI_ADDRESS_4_LINES;
+	sCommand.DataMode    = QSPI_DATA_4_LINES;
+	sCommand.NbData      = 2*AUDIO_BUFFER_SIZE;
+	
+	
+	int a11 = 1;
+	int a12 = 1;
+	int a21 = 1;
+	int a22 = 1;
+	float32_t sinOne,sinTwo;
+	for(i=0;i<AUDIO_TWO_SECONDS;i++) {
+																														// 400 and 700 hz frequency
+		sinOne = ((arm_sin_f32(TWO_PI_DIVIDED_BY_16000*((400*i)%16000)))+1)*2047; // temp buffer storage before xfered to flash
+		sinTwo = (arm_sin_f32(TWO_PI_DIVIDED_BY_16000*((700*i)%16000))+1)*2047; // temp buffer storage before xfered to flash
+		audioBufferLeft[i] = (a11*sinOne + a12*sinTwo)/2;
+		audioBufferRight[i] = (a21*sinOne + a22*sinTwo)/2;
+		if (!(i%1000) && i) {
+			
+			QSPI_AutoPollingMemReady(&hqspi); // wait for the flash to be ready
+			
+			// write the first sin wave
+			sCommand.Address     = 0;
+			cmd_cplt = 0;
+			status = HAL_QSPI_Command_IT(&hqspi, &sCommand);
+			if (status != HAL_OK)
+			{
+				Error_Handler();
+			}
+			
+			while(!cmd_cplt);
+			
+			
+			tx_cplt=0;
+			status = HAL_QSPI_Transmit_DMA(&hqspi, (uint8_t *) audioBufferRight);
+			if (status != HAL_OK)
+			{
+				Error_Handler();
+			}
+			
+			while(!tx_cplt);
+			
+			QSPI_AutoPollingMemReady(&hqspi); // wait for the flash to be ready
+			
+			// write the second sine wave
+			sCommand.Address     = 32000;
+			cmd_cplt=0;
+			status = HAL_QSPI_Command(&hqspi, &sCommand, 2*HAL_QPSI_TIMEOUT_DEFAULT_VALUE);
+			if (status != HAL_OK)
+			{
+				Error_Handler();
+			}
+			while(!cmd_cplt);
+			
+			tx_cplt=0;
+			status = HAL_QSPI_Transmit_DMA(&hqspi, (uint8_t *) audioBufferLeft);
+			if (status != HAL_OK)
+			{
+				Error_Handler();
+			}
+			while(!tx_cplt);
+		}
+	}
+	
+	sCommand.Instruction = FAST_READ_CMD;
+	
+	 HAL_TIM_Base_Start(&htim6);
+
 	// start DMA transfer to DAC
 	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1,(uint32_t*)audioBufferRight,AUDIO_BUFFER_SIZE, DAC_ALIGN_12B_R);
 	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2,(uint32_t*)audioBufferLeft,AUDIO_BUFFER_SIZE, DAC_ALIGN_12B_R);
-
-
-	for(i=0;i<AUDIO_BUFFER_SIZE_R;i++) {
-		audioBufferRight[i] = arm_sin_f32(TWO_PI_DIVIDED_BY_16000*(i%16000)); // temp buffer storage before xfered to flash
-	}
-
 	
 
   /* USER CODE END 2 */
@@ -224,6 +401,7 @@ static void MX_DAC1_Init(void)
   }
   /** DAC channel OUT2 config 
   */
+  sConfig.DAC_Trigger = DAC_TRIGGER_T7_TRGO;
   sConfig.DAC_ConnectOnChipPeripheral = DAC_CHIPCONNECT_ENABLE;
   if (HAL_DAC_ConfigChannel(&hdac1, &sConfig, DAC_CHANNEL_2) != HAL_OK)
   {
@@ -244,6 +422,7 @@ static void MX_QUADSPI_Init(void)
 {
 
   /* USER CODE BEGIN QUADSPI_Init 0 */
+	HAL_QSPI_DeInit(&hqspi);
 
   /* USER CODE END QUADSPI_Init 0 */
 
@@ -252,10 +431,10 @@ static void MX_QUADSPI_Init(void)
   /* USER CODE END QUADSPI_Init 1 */
   /* QUADSPI parameter configuration*/
   hqspi.Instance = QUADSPI;
-  hqspi.Init.ClockPrescaler = 255;
-  hqspi.Init.FifoThreshold = 1;
+  hqspi.Init.ClockPrescaler = 0;
+  hqspi.Init.FifoThreshold = 2;
   hqspi.Init.SampleShifting = QSPI_SAMPLE_SHIFTING_NONE;
-  hqspi.Init.FlashSize = 1;
+  hqspi.Init.FlashSize = 22;
   hqspi.Init.ChipSelectHighTime = QSPI_CS_HIGH_TIME_1_CYCLE;
   hqspi.Init.ClockMode = QSPI_CLOCK_MODE_0;
   if (HAL_QSPI_Init(&hqspi) != HAL_OK)
@@ -321,6 +500,9 @@ static void MX_DMA_Init(void)
   /* DMA1_Channel4_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Channel4_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel4_IRQn);
+  /* DMA1_Channel5_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Channel5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Channel5_IRQn);
 
 }
 
@@ -359,6 +541,7 @@ void Error_Handler(void)
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
 
+	while(1);
   /* USER CODE END Error_Handler_Debug */
 }
 

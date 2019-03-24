@@ -212,6 +212,48 @@ uint8_t BSP_QSPI_DeInit(void)
 }
 
 /**
+  * @brief  Reads an amount of data from the QSPI memory using DMA.
+  * @param  pData    : Pointer to data to be read
+  * @param  ReadAddr : Read start address
+  * @param  Size     : Size of data to read    
+  * @retval QSPI memory status
+  */
+uint8_t BSP_QSPI_Read_DMA(uint8_t* pData, uint32_t ReadAddr, uint32_t Size)
+{
+  QSPI_CommandTypeDef sCommand;
+
+  /* Initialize the read command */
+  sCommand.InstructionMode    = QSPI_INSTRUCTION_1_LINE;
+  sCommand.Instruction        = QUAD_INOUT_READ_CMD;
+  sCommand.AddressMode        = QSPI_ADDRESS_4_LINES;
+  sCommand.AddressSize        = QSPI_ADDRESS_24_BITS;
+  sCommand.Address            = ReadAddr;
+  sCommand.AlternateByteMode  = QSPI_ALTERNATE_BYTES_4_LINES;
+  sCommand.AlternateBytesSize = QSPI_ALTERNATE_BYTES_8_BITS;
+  sCommand.AlternateBytes     = MX25R6435F_ALT_BYTES_NO_PE_MODE;
+  sCommand.DataMode           = QSPI_DATA_4_LINES;
+  sCommand.DummyCycles        = MX25R6435F_DUMMY_CYCLES_READ_QUAD;
+  sCommand.NbData             = Size;
+  sCommand.DdrMode            = QSPI_DDR_MODE_DISABLE;
+  sCommand.DdrHoldHalfCycle   = QSPI_DDR_HHC_ANALOG_DELAY;
+  sCommand.SIOOMode           = QSPI_SIOO_INST_EVERY_CMD;
+  
+  /* Configure the command */
+  if (HAL_QSPI_Command(&QSPIHandle, &sCommand, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
+  {
+    return QSPI_ERROR;
+  }
+  
+  /* Reception of the data */
+  if (HAL_QSPI_Receive_DMA(&QSPIHandle, pData) != HAL_OK)
+  {
+    return QSPI_ERROR;
+  }
+
+  return QSPI_OK;
+}
+
+/**
   * @brief  Reads an amount of data from the QSPI memory.
   * @param  pData    : Pointer to data to be read
   * @param  ReadAddr : Read start address
@@ -833,7 +875,7 @@ static uint8_t QSPI_ResetMemory(QSPI_HandleTypeDef *hqspi)
   * @param  hqspi : QSPI handle
   * @retval None
   */
-static uint8_t QSPI_WriteEnable(QSPI_HandleTypeDef *hqspi)
+uint8_t QSPI_WriteEnable(QSPI_HandleTypeDef *hqspi)
 {
   QSPI_CommandTypeDef     sCommand;
   QSPI_AutoPollingTypeDef sConfig;
@@ -879,7 +921,7 @@ static uint8_t QSPI_WriteEnable(QSPI_HandleTypeDef *hqspi)
   * @param  Timeout : Timeout for auto-polling
   * @retval None
   */
-static uint8_t QSPI_AutoPollingMemReady(QSPI_HandleTypeDef *hqspi, uint32_t Timeout)
+uint8_t QSPI_AutoPollingMemReady(QSPI_HandleTypeDef *hqspi, uint32_t Timeout)
 {
   QSPI_CommandTypeDef     sCommand;
   QSPI_AutoPollingTypeDef sConfig;

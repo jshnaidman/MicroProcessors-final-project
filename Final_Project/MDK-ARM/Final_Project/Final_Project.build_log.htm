@@ -3,40 +3,39 @@
 <pre>
 <h1>µVision Build Log</h1>
 <h2>Tool Versions:</h2>
-IDE-Version: µVision V5.25.2.0
+IDE-Version: µVision V5.26.2.0
 Copyright (C) 2018 ARM Ltd and ARM Germany GmbH. All rights reserved.
-License Information: jacob shnaidman, personal, LIC=----
+License Information: jacob shnaidman, McGill, LIC=----
  
 Tool Versions:
-Toolchain:       MDK-Lite  Version: 5.25.2.0
+Toolchain:       MDK-Lite  Version: 5.26.2.0
 Toolchain Path:  C:\Keil_v5\ARM\ARMCC\Bin
 C Compiler:      Armcc.exe V5.06 update 6 (build 750)
 Assembler:       Armasm.exe V5.06 update 6 (build 750)
 Linker/Locator:  ArmLink.exe V5.06 update 6 (build 750)
 Library Manager: ArmAr.exe V5.06 update 6 (build 750)
 Hex Converter:   FromElf.exe V5.06 update 6 (build 750)
-CPU DLL:         SARMCM3.DLL V5.25.2.0
-Dialog DLL:      DCM.DLL V1.17.1.0
-Target DLL:      STLink\ST-LINKIII-KEIL_SWO.dll V3.0.1.0
-Dialog DLL:      TCM.DLL V1.35.1.0
+CPU DLL:         SARMCM3.DLL V5.26.2.0
+Dialog DLL:      DCM.DLL V1.17.2.0
+Target DLL:      STLink\ST-LINKIII-KEIL_SWO.dll V3.0.5.0
+Dialog DLL:      TCM.DLL V1.36.1.0
  
 <h2>Project:</h2>
-D:\School\444_ecse\ECSE444_Project\Final_Project\MDK-ARM\Final_Project.uvprojx
-Project File Date:  03/19/2019
+C:\Users\jacob\School\ECSE444_Project\Final_Project\MDK-ARM\Final_Project.uvprojx
+Project File Date:  03/24/2019
 
 <h2>Output:</h2>
 *** Using Compiler 'V5.06 update 6 (build 750)', folder: 'C:\Keil_v5\ARM\ARMCC\Bin'
 Build target 'Final_Project'
-compiling main.c...
-../Drivers/CMSIS/Include/arm_math.h(314): error:  #35: #error directive: "Define according the used Cortex core ARM_MATH_CM7, ARM_MATH_CM4, ARM_MATH_CM3, ARM_MATH_CM0PLUS or ARM_MATH_CM0"
-    #error "Define according the used Cortex core ARM_MATH_CM7, ARM_MATH_CM4, ARM_MATH_CM3, ARM_MATH_CM0PLUS or ARM_MATH_CM0"
-../Src/main.c: 0 warnings, 1 error
 compiling stm32l4xx_it.c...
-../Src/stm32l4xx_it.c(248): error:  #70: incomplete type is not allowed
-  void DAC_XFER_COMPLETE_CALLBACK
-../Src/stm32l4xx_it.c(251): error: At end of source:  #65: expected a ";"
-../Src/stm32l4xx_it.c: 0 warnings, 2 errors
-"Final_Project\Final_Project.axf" - 3 Error(s), 0 Warning(s).
+compiling main.c...
+../Src/main.c(442): warning:  #550-D: variable "sCommand"  was set but never used
+  	QSPI_CommandTypeDef sCommand;
+../Src/main.c: 1 warning, 0 errors
+linking...
+Program Size: Code=14764 RO-data=2548 RW-data=24 ZI-data=6464  
+FromELF: creating hex file...
+"Final_Project\Final_Project.axf" - 0 Error(s), 1 Warning(s).
 
 <h2>Software Packages used:</h2>
 
@@ -65,8 +64,7 @@ Package Vendor: Keil
    * Component: ARM::CMSIS:DSP:1.5.2
       Include file:  CMSIS\DSP\Include\arm_math.h
       Library file:  CMSIS\Lib\ARM\arm_cortexM4lf_math.lib
-Target not created.
-Build Time Elapsed:  00:00:03
+Build Time Elapsed:  00:00:07
 </pre>
 </body>
 </html>

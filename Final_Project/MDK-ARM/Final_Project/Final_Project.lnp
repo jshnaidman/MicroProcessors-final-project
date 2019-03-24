@@ -1,6 +1,6 @@
 --cpu=Cortex-M4.fp --branchpatch=sdcomp-29491-629360
 "final_project\startup_stm32l475xx.o"
-"C:\Keil_v5\ARM\PACK\ARM\CMSIS\5.4.0\CMSIS\Lib\ARM\arm_cortexM4lf_math.lib"
+"final_project\stm32l475e_iot01_qspi.o"
 "final_project\main.o"
 "final_project\stm32l4xx_it.o"
 "final_project\stm32l4xx_hal_msp.o"
@@ -25,6 +25,7 @@
 "final_project\stm32l4xx_hal_cortex.o"
 "final_project\stm32l4xx_hal_exti.o"
 "final_project\system_stm32l4xx.o"
+"C:\Keil_v5\ARM\PACK\ARM\CMSIS\5.4.0\CMSIS\Lib\ARM\arm_cortexM4lf_math.lib"
 --library_type=microlib --strict --scatter "Final_Project\Final_Project.sct"
 --summary_stderr --info summarysizes --map --load_addr_map_info --xref --callgraph --symbols
 --info sizes --info totals --info unused --info veneers
