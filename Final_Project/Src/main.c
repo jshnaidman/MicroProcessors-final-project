@@ -30,8 +30,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-#define RX_BUFFER_SIZE 1000
-#define AUDIO_BUFFER_SIZE 1000
+#define AUDIO_BUFFER_SIZE 2000
 #define BUFFER_SIZE 1000
 #define AUDIO_TWO_SECONDS 32000
 #define TWO_PI_DIVIDED_BY_16000 0.00039269908
@@ -60,13 +59,14 @@ TIM_HandleTypeDef htim6;
 
 /* USER CODE BEGIN PV */
 
-char rxBuffer[RX_BUFFER_SIZE];
 uint16_t audioBufferLeft[AUDIO_BUFFER_SIZE];
 uint16_t audioBufferRight[AUDIO_BUFFER_SIZE];
 int i;
 int rx_cplt=1;
 int tx_cplt=1;
 int cmd_cplt=1;
+int bufferLeftIndex = 0;
+int bufferRightIndex = AUDIO_TWO_SECONDS;
 
 /* USER CODE END PV */
 
@@ -209,97 +209,44 @@ int main(void)
   MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 	
-	QSPI_WriteEnable(&hqspi); 
+	HAL_TIM_Base_Start(&htim6);
 	
-	// Erase the contents of the QSPI registers
-	sCommand.Instruction = SECTOR_ERASE_CMD;
-	sCommand.AddressMode = QSPI_ADDRESS_1_LINE;
-	sCommand.Address     = 0;
-	sCommand.DataMode    = QSPI_DATA_NONE;
-	sCommand.DummyCycles = 0;
-	
-	cmd_cplt=0;
-	if (HAL_QSPI_Command_IT(&hqspi, &sCommand) != HAL_OK)
-	{
-		Error_Handler();
-	}
-	
-	while(!cmd_cplt);
-	
-	QSPI_AutoPollingMemReady(&hqspi); // wait for the flash to be ready
-	
-	QSPI_WriteEnable(&hqspi); // the registers were wiped, need to re-enable the write
-	
-	/* Writing Sequence ------------------------------------------------ */
-	sCommand.Instruction = QUAD_PAGE_PROG_CMD;
-	sCommand.AddressMode = QSPI_ADDRESS_4_LINES;
-	sCommand.DataMode    = QSPI_DATA_4_LINES;
-	sCommand.NbData      = 2*AUDIO_BUFFER_SIZE;
-	
+	BSP_QSPI_Init();
+	BSP_QSPI_Erase_Chip();
 	
 	int a11 = 1;
 	int a12 = 1;
 	int a21 = 1;
 	int a22 = 1;
 	float32_t sinOne,sinTwo;
-	for(i=0;i<AUDIO_TWO_SECONDS;i++) {
-																														// 400 and 700 hz frequency
-		sinOne = ((arm_sin_f32(TWO_PI_DIVIDED_BY_16000*((400*i)%16000)))+1)*2047; // temp buffer storage before xfered to flash
-		sinTwo = (arm_sin_f32(TWO_PI_DIVIDED_BY_16000*((700*i)%16000))+1)*2047; // temp buffer storage before xfered to flash
+	int angle1,angle2;
+	
+	// create mixed signal and transfer over to flash
+	for(i=0;i<AUDIO_TWO_SECONDS;i++) {														
+		// 400 and 700 hz frequency spread over 16000 samples per second for two seconds
+		angle1 = TWO_PI_DIVIDED_BY_16000*((400*i)%16000);
+		angle2 = TWO_PI_DIVIDED_BY_16000*((700*i)%16000);
+		sinOne = arm_sin_f32(angle1);
+		sinOne = (sinOne+1)*2048;
+		sinTwo = arm_sin_f32(angle2);
+		sinTwo = (sinTwo+1)*2048;
 		audioBufferLeft[i] = (a11*sinOne + a12*sinTwo)/2;
 		audioBufferRight[i] = (a21*sinOne + a22*sinTwo)/2;
 		if (!(i%1000) && i) {
-			
-			QSPI_AutoPollingMemReady(&hqspi); // wait for the flash to be ready
-			
-			// write the first sin wave
-			sCommand.Address     = 0;
-			cmd_cplt = 0;
-			status = HAL_QSPI_Command_IT(&hqspi, &sCommand);
-			if (status != HAL_OK)
-			{
-				Error_Handler();
-			}
-			
-			while(!cmd_cplt);
-			
-			
-			tx_cplt=0;
-			status = HAL_QSPI_Transmit_DMA(&hqspi, (uint8_t *) audioBufferRight);
-			if (status != HAL_OK)
-			{
-				Error_Handler();
-			}
-			
-			while(!tx_cplt);
-			
-			QSPI_AutoPollingMemReady(&hqspi); // wait for the flash to be ready
-			
-			// write the second sine wave
-			sCommand.Address     = 32000;
-			cmd_cplt=0;
-			status = HAL_QSPI_Command(&hqspi, &sCommand, 2*HAL_QPSI_TIMEOUT_DEFAULT_VALUE);
-			if (status != HAL_OK)
-			{
-				Error_Handler();
-			}
-			while(!cmd_cplt);
-			
-			tx_cplt=0;
-			status = HAL_QSPI_Transmit_DMA(&hqspi, (uint8_t *) audioBufferLeft);
-			if (status != HAL_OK)
-			{
-				Error_Handler();
-			}
-			while(!tx_cplt);
+			BSP_QSPI_Write((uint8_t*)audioBufferLeft,i,2*AUDIO_BUFFER_SIZE);
+			BSP_QSPI_Write((uint8_t*) audioBufferRight,AUDIO_TWO_SECONDS+i,2*AUDIO_BUFFER_SIZE);
 		}
 	}
 	
-	sCommand.Instruction = FAST_READ_CMD;
+	// read from flash and store in buffer
+	BSP_QSPI_Read((uint8_t*) audioBufferLeft,bufferLeftIndex,2*AUDIO_BUFFER_SIZE);
+	BSP_QSPI_Read((uint8_t*) audioBufferRight,bufferRightIndex,2*AUDIO_BUFFER_SIZE);
 	
-	 HAL_TIM_Base_Start(&htim6);
-
+	bufferRightIndex += AUDIO_BUFFER_SIZE;
+	bufferLeftIndex += AUDIO_BUFFER_SIZE;
+	
 	// start DMA transfer to DAC
+	// These have callback functions which read from flash and store in audio buffers
 	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1,(uint32_t*)audioBufferRight,AUDIO_BUFFER_SIZE, DAC_ALIGN_12B_R);
 	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2,(uint32_t*)audioBufferLeft,AUDIO_BUFFER_SIZE, DAC_ALIGN_12B_R);
 	
@@ -432,7 +379,7 @@ static void MX_QUADSPI_Init(void)
   /* QUADSPI parameter configuration*/
   hqspi.Instance = QUADSPI;
   hqspi.Init.ClockPrescaler = 0;
-  hqspi.Init.FifoThreshold = 2;
+  hqspi.Init.FifoThreshold = 4;
   hqspi.Init.SampleShifting = QSPI_SAMPLE_SHIFTING_NONE;
   hqspi.Init.FlashSize = 22;
   hqspi.Init.ChipSelectHighTime = QSPI_CS_HIGH_TIME_1_CYCLE;

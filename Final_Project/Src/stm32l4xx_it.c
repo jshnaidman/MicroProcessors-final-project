@@ -23,6 +23,7 @@
 #include "stm32l4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "stm32l475e_iot01_qspi.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -53,11 +54,17 @@
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
+#define AUDIO_BUFFER_SIZE 2000
+
 extern int rx_cplt;
 extern int tx_cplt;
 extern int cmd_cplt;
 
+extern int bufferLeftIndex;
+extern int bufferRightIndex;
 
+extern uint16_t audioBufferLeft;
+extern uint16_t audioBufferRight;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -280,34 +287,24 @@ void QUADSPI_IRQHandler(void)
 
 /* USER CODE BEGIN 1 */
 
-/**
-  * @brief  Rx completed callbacks.
-  * @param  hqspi: QSPI handle
-  * @retval None
-  */
-void HAL_QSPI_RxCpltCallback(QSPI_HandleTypeDef *hqspi)
-{
-  rx_cplt = 1;
+void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
+	BSP_QSPI_Read((uint8_t*) audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE);
+	bufferLeftIndex += AUDIO_BUFFER_SIZE/2;
 }
 
-/**
-  * @brief  Command completed callbacks.
-  * @param  hqspi: QSPI handle
-  * @retval None
-  */
-void HAL_QSPI_CmdCpltCallback(QSPI_HandleTypeDef *hqspi)
-{
-  cmd_cplt = 1;
+void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
+	BSP_QSPI_Read((uint8_t*) audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE);
+	bufferLeftIndex += AUDIO_BUFFER_SIZE/2;
 }
 
-/**
-  * @brief  Tx Transfer completed callbacks.
-  * @param  hqspi: QSPI handle
-  * @retval None
-  */
- void HAL_QSPI_TxCpltCallback(QSPI_HandleTypeDef *hqspi)
-{
-  tx_cplt = 1; 
+void HAL_DAC_ConvHalfCpltCallbackCh2(DAC_HandleTypeDef * hdac) {
+	BSP_QSPI_Read((uint8_t*) audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE);
+	bufferRightIndex += AUDIO_BUFFER_SIZE/2;
+}
+
+void HAL_DAC_ConvCpltCallbackCh2(DAC_HandleTypeDef * hdac) {
+	BSP_QSPI_Read((uint8_t*) audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE);
+	bufferRightIndex += AUDIO_BUFFER_SIZE/2;
 }
 
 /* USER CODE END 1 */
