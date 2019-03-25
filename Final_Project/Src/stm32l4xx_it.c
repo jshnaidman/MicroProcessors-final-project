@@ -54,7 +54,7 @@
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-#define AUDIO_BUFFER_SIZE 4000
+#define AUDIO_BUFFER_SIZE 2000
 #define AUDIO_TWO_SECONDS 32000
 
 extern int rx_cplt;
@@ -258,6 +258,20 @@ void DMA1_Channel5_IRQHandler(void)
 }
 
 /**
+  * @brief This function handles EXTI line[9:5] interrupts.
+  */
+void EXTI9_5_IRQHandler(void)
+{
+  /* USER CODE BEGIN EXTI9_5_IRQn 0 */
+
+  /* USER CODE END EXTI9_5_IRQn 0 */
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_9);
+  /* USER CODE BEGIN EXTI9_5_IRQn 1 */
+
+  /* USER CODE END EXTI9_5_IRQn 1 */
+}
+
+/**
   * @brief This function handles TIM6 global interrupt, DAC channel1 and channel2 underrun error interrupts.
   */
 void TIM6_DAC_IRQHandler(void)
@@ -289,21 +303,19 @@ void QUADSPI_IRQHandler(void)
 /* USER CODE BEGIN 1 */
 
 void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
-	for(int i=0;i<AUDIO_BUFFER_SIZE/2;i++) {
-		BSP_QSPI_Read(&audioBufferLeft[i],bufferLeftIndex++,1);
-		BSP_QSPI_Read(&audioBufferRight[i],bufferRightIndex++,1);
-	}
+	// read the first half of the audio buffer
+	BSP_QSPI_Read(audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE);
+	BSP_QSPI_Read(audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE);
+	bufferLeftIndex = (bufferLeftIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS; 
+	bufferRightIndex = (bufferRightIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS +AUDIO_TWO_SECONDS;
 }
 
 void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
-	for(int i=AUDIO_BUFFER_SIZE/2;i<AUDIO_BUFFER_SIZE;i++) {
-		BSP_QSPI_Read(&audioBufferLeft[i],bufferLeftIndex++,1);
-		BSP_QSPI_Read(&audioBufferRight[i],bufferRightIndex++,1);
-	}
-	if (bufferLeftIndex>=AUDIO_TWO_SECONDS) {
-		bufferLeftIndex = 0;
-		bufferRightIndex = AUDIO_TWO_SECONDS;
-	}
+	// read the second half of the audio buffer
+		BSP_QSPI_Read(&audioBufferLeft[AUDIO_BUFFER_SIZE/2],bufferLeftIndex,AUDIO_BUFFER_SIZE);
+		BSP_QSPI_Read(&audioBufferRight[AUDIO_BUFFER_SIZE/2],bufferRightIndex,AUDIO_BUFFER_SIZE);
+		bufferLeftIndex = (bufferLeftIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS; 
+		bufferRightIndex = (bufferRightIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS + AUDIO_TWO_SECONDS;
 }
 
 

@@ -1,7 +1,7 @@
 #MicroXplorer Configuration settings - do not modify
 DAC1.DAC_Channel-DAC_OUT2_ExtAndInt=DAC_CHANNEL_2
 DAC1.DAC_Trigger-DAC_OUT1_ExtAndInt=DAC_TRIGGER_T6_TRGO
-DAC1.DAC_Trigger-DAC_OUT2_ExtAndInt=DAC_TRIGGER_T7_TRGO
+DAC1.DAC_Trigger-DAC_OUT2_ExtAndInt=DAC_TRIGGER_T6_TRGO
 DAC1.IPParameters=DAC_Channel-DAC_OUT2_ExtAndInt,DAC_Trigger-DAC_OUT1_ExtAndInt,DAC_Trigger-DAC_OUT2_ExtAndInt
 Dma.DAC_CH1.0.Direction=DMA_MEMORY_TO_PERIPH
 Dma.DAC_CH1.0.Instance=DMA1_Channel3
@@ -67,6 +67,7 @@ NVIC.DMA1_Channel3_IRQn=true\:0\:0\:false\:false\:true\:false\:true
 NVIC.DMA1_Channel4_IRQn=true\:0\:0\:false\:false\:true\:false\:true
 NVIC.DMA1_Channel5_IRQn=true\:0\:0\:false\:false\:true\:false\:true
 NVIC.DebugMonitor_IRQn=true\:0\:0\:false\:false\:true\:false\:false
+NVIC.EXTI9_5_IRQn=true\:0\:0\:false\:false\:true\:true\:true
 NVIC.HardFault_IRQn=true\:0\:0\:false\:false\:true\:false\:false
 NVIC.MemoryManagement_IRQn=true\:0\:0\:false\:false\:true\:false\:false
 NVIC.NonMaskableInt_IRQn=true\:0\:0\:false\:false\:true\:false\:false

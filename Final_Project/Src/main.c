@@ -30,12 +30,9 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-#define AUDIO_BUFFER_SIZE 4000 //2000 samples
-#define BUFFER_SIZE 1000
+#define AUDIO_BUFFER_SIZE 2000 //2000 samples
 #define AUDIO_TWO_SECONDS 32000
 #define TWO_PI_DIVIDED_BY_16000 0.00039269908
-#define LEFT_BUFFER_START_INDEX (-1000)
-#define RIGHT_BUFFER_START_INDEX (AUDIO_TWO_SECONDS - 1000)
 
 /* USER CODE END PTD */
 
@@ -63,8 +60,8 @@ TIM_HandleTypeDef htim6;
 
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
-uint8_t audioBufferLeft[AUDIO_BUFFER_SIZE];
-uint8_t audioBufferRight[AUDIO_BUFFER_SIZE];
+uint16_t audioBufferLeft[AUDIO_BUFFER_SIZE];
+uint16_t audioBufferRight[AUDIO_BUFFER_SIZE];
 int i;
 int rx_cplt=1;
 int tx_cplt=1;
@@ -123,6 +120,7 @@ int main(void)
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_DAC1_Init();
+  MX_QUADSPI_Init();
   MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 	
@@ -152,33 +150,40 @@ int main(void)
 		sinTwo = sinTwo+1;
 		normalizedSineOne = (a11*sinOne + a12*sinTwo)/MAX(2*(a11+a12),1);
 		normalizedSineTwo = (a21*sinOne + a22*sinTwo)/MAX(2*(a21+a22),1);
-		mixOne = (uint16_t) (normalizedSineOne*4095);
-		mixTwo = (uint16_t) (normalizedSineTwo*4095);
+		audioBufferLeft[i%AUDIO_BUFFER_SIZE] = (uint16_t) (normalizedSineOne*4095);
+		audioBufferRight[i%AUDIO_BUFFER_SIZE] = (uint16_t) (normalizedSineTwo*4095);
+		if (!(i%AUDIO_BUFFER_SIZE) && i) {
+			BSP_QSPI_Write((uint8_t*) audioBufferLeft,bufferLeftIndex,2*AUDIO_BUFFER_SIZE);
+			BSP_QSPI_Write((uint8_t*) audioBufferRight,bufferRightIndex,2*AUDIO_BUFFER_SIZE);
+			bufferLeftIndex += 2*AUDIO_BUFFER_SIZE;
+			bufferRightIndex += 2*AUDIO_BUFFER_SIZE;
+		}
 		// split into two 8 bit numbers
-		mixOne1 = (uint8_t) mixOne>>8;
-		mixOne2 = (uint8_t) mixOne&0x0000FFFF;
-		mixTwo1 = (uint8_t) mixTwo>>8;
-		mixTwo2 = (uint8_t) mixTwo&0x0000FFFF;	
-		BSP_QSPI_Write(&mixOne1,bufferLeftIndex++,1);
-		BSP_QSPI_Write(&mixOne2,bufferLeftIndex++,1);
-		BSP_QSPI_Write(&mixTwo1,bufferRightIndex++,1);
-		BSP_QSPI_Write(&mixTwo2,bufferRightIndex++,1);
+//		mixOne1 = (uint8_t) mixOne>>8;
+//		mixOne2 = (uint8_t) mixOne&0x0000FFFF;
+//		mixTwo1 = (uint8_t) mixTwo>>8;
+//		mixTwo2 = (uint8_t) mixTwo&0x0000FFFF;	
+//		BSP_QSPI_Write(&mixOne1,bufferLeftIndex++,1);
+//		BSP_QSPI_Write(&mixOne2,bufferLeftIndex++,1);
+//		BSP_QSPI_Write(&mixTwo1,bufferRightIndex++,1);
+//		BSP_QSPI_Write(&mixTwo2,bufferRightIndex++,1);
 	}
 	
 	for(i=0;i<AUDIO_BUFFER_SIZE;i++) {
 		audioBufferLeft[i] = 0;
 	}
+	for(i=0;i<AUDIO_BUFFER_SIZE;i++) {
+		audioBufferRight[i] = 0;
+	}
 	bufferLeftIndex = 0;
 	bufferRightIndex = AUDIO_TWO_SECONDS;
 	
 	// read from flash and store in buffer
-	for(i=0;i<AUDIO_BUFFER_SIZE;i++) {
-		BSP_QSPI_Read(&audioBufferLeft[i],bufferLeftIndex++,1);
-		BSP_QSPI_Read(&audioBufferRight[i],bufferRightIndex++,1);
-	}
+	BSP_QSPI_Read((uint8_t *) audioBufferLeft,bufferLeftIndex,2*AUDIO_BUFFER_SIZE);
+	BSP_QSPI_Read((uint8_t *) audioBufferRight,bufferRightIndex,2*AUDIO_BUFFER_SIZE);
 	
-	bufferRightIndex += AUDIO_BUFFER_SIZE;
-	bufferLeftIndex += AUDIO_BUFFER_SIZE;
+	bufferRightIndex += 2*AUDIO_BUFFER_SIZE;
+	bufferLeftIndex += 2*AUDIO_BUFFER_SIZE;
 	
 	// start DMA transfer to DAC
 	// These have callback functions which read from flash and store in audio buffers
@@ -283,7 +288,6 @@ static void MX_DAC1_Init(void)
   }
   /** DAC channel OUT2 config 
   */
-  sConfig.DAC_Trigger = DAC_TRIGGER_T7_TRGO;
   sConfig.DAC_ConnectOnChipPeripheral = DAC_CHIPCONNECT_ENABLE;
   if (HAL_DAC_ConfigChannel(&hdac1, &sConfig, DAC_CHANNEL_2) != HAL_OK)
   {
@@ -314,7 +318,7 @@ static void MX_QUADSPI_Init(void)
   /* QUADSPI parameter configuration*/
   hqspi.Instance = QUADSPI;
   hqspi.Init.ClockPrescaler = 0;
-  hqspi.Init.FifoThreshold = 4;
+  hqspi.Init.FifoThreshold = 2;
   hqspi.Init.SampleShifting = QSPI_SAMPLE_SHIFTING_NONE;
   hqspi.Init.FlashSize = 22;
   hqspi.Init.ChipSelectHighTime = QSPI_CS_HIGH_TIME_1_CYCLE;
@@ -407,6 +411,10 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
 }
 
