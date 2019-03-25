@@ -54,7 +54,8 @@
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-#define AUDIO_BUFFER_SIZE 2000
+#define AUDIO_BUFFER_SIZE 4000
+#define AUDIO_TWO_SECONDS 32000
 
 extern int rx_cplt;
 extern int tx_cplt;
@@ -63,8 +64,8 @@ extern int cmd_cplt;
 extern int bufferLeftIndex;
 extern int bufferRightIndex;
 
-extern uint16_t audioBufferLeft;
-extern uint16_t audioBufferRight;
+extern uint8_t audioBufferLeft[];
+extern uint8_t audioBufferRight[];
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -288,24 +289,23 @@ void QUADSPI_IRQHandler(void)
 /* USER CODE BEGIN 1 */
 
 void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
-	BSP_QSPI_Read((uint8_t*) audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE);
-	bufferLeftIndex += AUDIO_BUFFER_SIZE/2;
+	for(int i=0;i<AUDIO_BUFFER_SIZE/2;i++) {
+		BSP_QSPI_Read(&audioBufferLeft[i],bufferLeftIndex++,1);
+		BSP_QSPI_Read(&audioBufferRight[i],bufferRightIndex++,1);
+	}
 }
 
 void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
-	BSP_QSPI_Read((uint8_t*) audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE);
-	bufferLeftIndex += AUDIO_BUFFER_SIZE/2;
+	for(int i=AUDIO_BUFFER_SIZE/2;i<AUDIO_BUFFER_SIZE;i++) {
+		BSP_QSPI_Read(&audioBufferLeft[i],bufferLeftIndex++,1);
+		BSP_QSPI_Read(&audioBufferRight[i],bufferRightIndex++,1);
+	}
+	if (bufferLeftIndex>=AUDIO_TWO_SECONDS) {
+		bufferLeftIndex = 0;
+		bufferRightIndex = AUDIO_TWO_SECONDS;
+	}
 }
 
-void HAL_DAC_ConvHalfCpltCallbackCh2(DAC_HandleTypeDef * hdac) {
-	BSP_QSPI_Read((uint8_t*) audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE);
-	bufferRightIndex += AUDIO_BUFFER_SIZE/2;
-}
-
-void HAL_DAC_ConvCpltCallbackCh2(DAC_HandleTypeDef * hdac) {
-	BSP_QSPI_Read((uint8_t*) audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE);
-	bufferRightIndex += AUDIO_BUFFER_SIZE/2;
-}
 
 /* USER CODE END 1 */
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

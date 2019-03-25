@@ -30,7 +30,7 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-#define AUDIO_BUFFER_SIZE 2000
+#define AUDIO_BUFFER_SIZE 4000 //2000 samples
 #define BUFFER_SIZE 1000
 #define AUDIO_TWO_SECONDS 32000
 #define TWO_PI_DIVIDED_BY_16000 0.00039269908
@@ -61,8 +61,10 @@ TIM_HandleTypeDef htim6;
 
 /* USER CODE BEGIN PV */
 
-uint16_t audioBufferLeft[AUDIO_BUFFER_SIZE];
-uint16_t audioBufferRight[AUDIO_BUFFER_SIZE];
+#define MAX(a,b) (((a)>(b))?(a):(b))
+
+uint8_t audioBufferLeft[AUDIO_BUFFER_SIZE];
+uint8_t audioBufferRight[AUDIO_BUFFER_SIZE];
 int i;
 int rx_cplt=1;
 int tx_cplt=1;
@@ -222,6 +224,8 @@ int main(void)
 	int a22 = 0;
 	float32_t sinOne,sinTwo;
 	float32_t angle1,angle2;
+	uint16_t mixOne,mixTwo;
+	uint8_t mixOne1,mixOne2, mixTwo1,mixTwo2;
 	
 	// create mixed signal and transfer over to flash
 	for(i=0;i<AUDIO_TWO_SECONDS;i++) {														
@@ -232,25 +236,38 @@ int main(void)
 		sinOne = (sinOne+1)*2047;
 		sinTwo = arm_sin_f32(angle2);
 		sinTwo = (sinTwo+1)*2047;
-		audioBufferLeft[i] = (uint16_t)((a11*sinOne + a12*sinTwo)/2 + 1);
-		audioBufferRight[i] = (uint16_t) ((a21*sinOne + a22*sinTwo)/2 + 1);
-		if (!(i%1000) && i) {
-			BSP_QSPI_Write((uint8_t*)audioBufferLeft,LEFT_BUFFER_START_INDEX + i,2*AUDIO_BUFFER_SIZE);
-			BSP_QSPI_Write((uint8_t*) audioBufferRight,RIGHT_BUFFER_START_INDEX + i,2*AUDIO_BUFFER_SIZE);
-		}
+		mixOne = (uint16_t) ((a11*sinOne + a12*sinTwo)/2 + 1)/MAX((a11*a22 - a12*a21),1);
+		mixTwo = (uint16_t) ((a21*sinOne + a22*sinTwo)/2 + 1)/MAX((a11*a22 - a12*a21),1);
+		// split into two 8 bit numbers
+		mixOne1 = (uint8_t) mixOne>>8;
+		mixOne2 = (uint8_t) mixOne&0x0000FFFF;
+		mixTwo1 = (uint8_t) mixTwo>>8;
+		mixTwo2 = (uint8_t) mixTwo&0x0000FFFF;	
+		BSP_QSPI_Write(&mixOne1,bufferLeftIndex++,1);
+		BSP_QSPI_Write(&mixOne2,bufferLeftIndex++,1);
+		BSP_QSPI_Write(&mixTwo1,bufferRightIndex++,1);
+		BSP_QSPI_Write(&mixTwo2,bufferRightIndex++,1);
 	}
 	
+	for(i=0;i<AUDIO_BUFFER_SIZE;i++) {
+		audioBufferLeft[i] = 0;
+	}
+	bufferLeftIndex = 0;
+	bufferRightIndex = AUDIO_TWO_SECONDS;
+	
 	// read from flash and store in buffer
-	BSP_QSPI_Read((uint8_t*) audioBufferLeft,bufferLeftIndex,2*AUDIO_BUFFER_SIZE);
-	BSP_QSPI_Read((uint8_t*) audioBufferRight,bufferRightIndex,2*AUDIO_BUFFER_SIZE);
+	for(i=0;i<AUDIO_BUFFER_SIZE;i++) {
+		BSP_QSPI_Read(&audioBufferLeft[i],bufferLeftIndex++,1);
+		BSP_QSPI_Read(&audioBufferRight[i],bufferRightIndex++,1);
+	}
 	
 	bufferRightIndex += AUDIO_BUFFER_SIZE;
 	bufferLeftIndex += AUDIO_BUFFER_SIZE;
 	
 	// start DMA transfer to DAC
 	// These have callback functions which read from flash and store in audio buffers
-	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1,(uint32_t*)audioBufferRight,AUDIO_BUFFER_SIZE, DAC_ALIGN_12B_R);
-	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2,(uint32_t*)audioBufferLeft,AUDIO_BUFFER_SIZE, DAC_ALIGN_12B_R);
+	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1,(uint32_t*)audioBufferLeft,AUDIO_BUFFER_SIZE, DAC_ALIGN_12B_R);
+	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2,(uint32_t*)audioBufferRight,AUDIO_BUFFER_SIZE, DAC_ALIGN_12B_R);
 	
 
   /* USER CODE END 2 */
