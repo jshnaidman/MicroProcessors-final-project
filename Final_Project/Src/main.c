@@ -123,14 +123,13 @@ int main(void)
   MX_GPIO_Init();
   MX_DMA_Init();
   MX_DAC1_Init();
-  MX_QUADSPI_Init();
   MX_TIM6_Init();
   /* USER CODE BEGIN 2 */
 	
 	HAL_TIM_Base_Start(&htim6);
 	
 	BSP_QSPI_Init();
-	// BSP_QSPI_Erase_Chip(); // this can take like 30 seconds. 
+	BSP_QSPI_Erase_Chip(); // this can take like 30 seconds. 
 	
 	int a11 = 1;
 	int a12 = 0;
