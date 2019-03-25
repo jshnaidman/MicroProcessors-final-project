@@ -233,11 +233,13 @@ int main(void)
 		angle1 = TWO_PI_DIVIDED_BY_16000*((400*i)%16000);
 		angle2 = TWO_PI_DIVIDED_BY_16000*((700*i)%16000);
 		sinOne = arm_sin_f32(angle1);
-		sinOne = (sinOne+1)*2047;
+		sinOne = sinOne+1;
 		sinTwo = arm_sin_f32(angle2);
-		sinTwo = (sinTwo+1)*2047;
-		mixOne = (uint16_t) ((a11*sinOne + a12*sinTwo)/2 + 1)/MAX((a11*a22 - a12*a21),1);
-		mixTwo = (uint16_t) ((a21*sinOne + a22*sinTwo)/2 + 1)/MAX((a11*a22 - a12*a21),1);
+		sinTwo = sinTwo+1;
+		mixOne = (uint16_t) ((a11*sinOne + a12*sinTwo))/MAX(a11+a12,1);
+		mixTwo = (uint16_t) ((a21*sinOne + a22*sinTwo))/MAX(a11+a12,1);
+		mixOne = mixOne*4095;
+		mixTwo = mixTwo*4095;
 		// split into two 8 bit numbers
 		mixOne1 = (uint8_t) mixOne>>8;
 		mixOne2 = (uint8_t) mixOne&0x0000FFFF;
