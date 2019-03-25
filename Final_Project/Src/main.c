@@ -83,90 +83,6 @@ static void MX_QUADSPI_Init(void);
 static void MX_TIM6_Init(void);
 /* USER CODE BEGIN PFP */
 
-
-/**
-  * @brief  This function read the SR of the memory and wait the EOP.
-  * @param  hqspi   : QSPI handle
-  * @param  Timeout : Timeout for auto-polling
-  * @retval None
-  */
-uint8_t QSPI_AutoPollingMemReady(QSPI_HandleTypeDef *hqspi)
-{
-  QSPI_CommandTypeDef     sCommand;
-  QSPI_AutoPollingTypeDef sConfig;
-
-  /* Configure automatic polling mode to wait for memory ready */  
-  sCommand.InstructionMode   = QSPI_INSTRUCTION_1_LINE;
-  sCommand.Instruction       = READ_STATUS_REG_CMD;
-  sCommand.AddressMode       = QSPI_ADDRESS_NONE;
-  sCommand.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
-  sCommand.DataMode          = QSPI_DATA_1_LINE;
-  sCommand.DummyCycles       = 0;
-  sCommand.DdrMode           = QSPI_DDR_MODE_DISABLE;
-  sCommand.DdrHoldHalfCycle  = QSPI_DDR_HHC_ANALOG_DELAY;
-  sCommand.SIOOMode          = QSPI_SIOO_INST_EVERY_CMD;
-
-  sConfig.Match           = 0;
-  sConfig.Mask            = MX25R6435F_SR_WIP;
-  sConfig.MatchMode       = QSPI_MATCH_MODE_AND;
-  sConfig.StatusBytesSize = 1;
-  sConfig.Interval        = 0x10;
-  sConfig.AutomaticStop   = QSPI_AUTOMATIC_STOP_ENABLE;
-
-  if (HAL_QSPI_AutoPolling(hqspi, &sCommand, &sConfig, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-  {
-    return QSPI_ERROR;
-  }
-
-  return QSPI_OK;
-}
-
-
-/**
-  * @brief  This function send a Write Enable and wait it is effective.
-  * @param  hqspi : QSPI handle
-  * @retval None
-  */
-uint8_t QSPI_WriteEnable(QSPI_HandleTypeDef *hqspi)
-{
-  QSPI_CommandTypeDef     sCommand;
-  QSPI_AutoPollingTypeDef sConfig;
-
-  /* Enable write operations */
-  sCommand.InstructionMode   = QSPI_INSTRUCTION_1_LINE;
-  sCommand.Instruction       = WRITE_ENABLE_CMD;
-  sCommand.AddressMode       = QSPI_ADDRESS_NONE;
-  sCommand.AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE;
-  sCommand.DataMode          = QSPI_DATA_NONE;
-  sCommand.DummyCycles       = 0;
-  sCommand.DdrMode           = QSPI_DDR_MODE_DISABLE;
-  sCommand.DdrHoldHalfCycle  = QSPI_DDR_HHC_ANALOG_DELAY;
-  sCommand.SIOOMode          = QSPI_SIOO_INST_EVERY_CMD;
-
-  if (HAL_QSPI_Command(hqspi, &sCommand, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-  {
-    return QSPI_ERROR;
-  }
-  
-  /* Configure automatic polling mode to wait for write enabling */  
-  sConfig.Match           = MX25R6435F_SR_WEL;
-  sConfig.Mask            = MX25R6435F_SR_WEL;
-  sConfig.MatchMode       = QSPI_MATCH_MODE_AND;
-  sConfig.StatusBytesSize = 1;
-  sConfig.Interval        = 0x10;
-  sConfig.AutomaticStop   = QSPI_AUTOMATIC_STOP_ENABLE;
-
-  sCommand.Instruction    = READ_STATUS_REG_CMD;
-  sCommand.DataMode       = QSPI_DATA_1_LINE;
-
-  if (HAL_QSPI_AutoPolling(hqspi, &sCommand, &sConfig, HAL_QPSI_TIMEOUT_DEFAULT_VALUE) != HAL_OK)
-  {
-    return QSPI_ERROR;
-  }
-
-  return QSPI_OK;
-}
-
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -192,8 +108,6 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-	
-	BSP_QSPI_Init();
 
   /* USER CODE END Init */
 
@@ -223,6 +137,7 @@ int main(void)
 	int a21 = 1;
 	int a22 = 0;
 	float32_t sinOne,sinTwo;
+	float32_t normalizedSineOne, normalizedSineTwo;
 	float32_t angle1,angle2;
 	uint16_t mixOne,mixTwo;
 	uint8_t mixOne1,mixOne2, mixTwo1,mixTwo2;
@@ -236,10 +151,10 @@ int main(void)
 		sinOne = sinOne+1;
 		sinTwo = arm_sin_f32(angle2);
 		sinTwo = sinTwo+1;
-		mixOne = (uint16_t) ((a11*sinOne + a12*sinTwo))/MAX(a11+a12,1);
-		mixTwo = (uint16_t) ((a21*sinOne + a22*sinTwo))/MAX(a11+a12,1);
-		mixOne = mixOne*4095;
-		mixTwo = mixTwo*4095;
+		normalizedSineOne = (a11*sinOne + a12*sinTwo)/MAX(2*(a11+a12),1);
+		normalizedSineTwo = (a21*sinOne + a22*sinTwo)/MAX(2*(a21+a22),1);
+		mixOne = (uint16_t) (normalizedSineOne*4095);
+		mixTwo = (uint16_t) (normalizedSineTwo*4095);
 		// split into two 8 bit numbers
 		mixOne1 = (uint8_t) mixOne>>8;
 		mixOne2 = (uint8_t) mixOne&0x0000FFFF;
