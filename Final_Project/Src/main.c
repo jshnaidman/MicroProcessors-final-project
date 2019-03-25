@@ -129,6 +129,7 @@ int main(void)
 	BSP_QSPI_Init();
 	BSP_QSPI_Erase_Chip(); // this can take like 30 seconds. 
 	
+	// matrix coefficients
 	int a11 = 1;
 	int a12 = 0;
 	int a21 = 1;
@@ -145,36 +146,30 @@ int main(void)
 		angle1 = TWO_PI_DIVIDED_BY_16000*((400*i)%16000);
 		angle2 = TWO_PI_DIVIDED_BY_16000*((700*i)%16000);
 		sinOne = arm_sin_f32(angle1);
-		sinOne = sinOne+1;
+		sinOne = sinOne+1; // maps from 0 to 2
 		sinTwo = arm_sin_f32(angle2);
 		sinTwo = sinTwo+1;
-		normalizedSineOne = (a11*sinOne + a12*sinTwo)/MAX(2*(a11+a12),1);
+		normalizedSineOne = (a11*sinOne + a12*sinTwo)/MAX(2*(a11+a12),1); // combine and normalize between 0 and 1
 		normalizedSineTwo = (a21*sinOne + a22*sinTwo)/MAX(2*(a21+a22),1);
-		audioBufferLeft[i%AUDIO_BUFFER_SIZE] = (uint16_t) (normalizedSineOne*4095);
+		audioBufferLeft[i%AUDIO_BUFFER_SIZE] = (uint16_t) (normalizedSineOne*4095); // map between 0-4095
 		audioBufferRight[i%AUDIO_BUFFER_SIZE] = (uint16_t) (normalizedSineTwo*4095);
-		if (!(i%AUDIO_BUFFER_SIZE) && i) {
-			BSP_QSPI_Write((uint8_t*) audioBufferLeft,bufferLeftIndex,2*AUDIO_BUFFER_SIZE);
-			BSP_QSPI_Write((uint8_t*) audioBufferRight,bufferRightIndex,2*AUDIO_BUFFER_SIZE);
+		if (!((i+1)%AUDIO_BUFFER_SIZE)) {
+			BSP_QSPI_Write((uint8_t*) audioBufferLeft,bufferLeftIndex,2*AUDIO_BUFFER_SIZE); // write 2000 bytes at a time
+			BSP_QSPI_Write((uint8_t*) audioBufferRight,bufferRightIndex,2*AUDIO_BUFFER_SIZE);// to flash
 			bufferLeftIndex += 2*AUDIO_BUFFER_SIZE;
 			bufferRightIndex += 2*AUDIO_BUFFER_SIZE;
 		}
-		// split into two 8 bit numbers
-//		mixOne1 = (uint8_t) mixOne>>8;
-//		mixOne2 = (uint8_t) mixOne&0x0000FFFF;
-//		mixTwo1 = (uint8_t) mixTwo>>8;
-//		mixTwo2 = (uint8_t) mixTwo&0x0000FFFF;	
-//		BSP_QSPI_Write(&mixOne1,bufferLeftIndex++,1);
-//		BSP_QSPI_Write(&mixOne2,bufferLeftIndex++,1);
-//		BSP_QSPI_Write(&mixTwo1,bufferRightIndex++,1);
-//		BSP_QSPI_Write(&mixTwo2,bufferRightIndex++,1);
 	}
 	
+	// this is here to demonstrate that buffers are cleared and it is really reading from flash
 	for(i=0;i<AUDIO_BUFFER_SIZE;i++) {
 		audioBufferLeft[i] = 0;
 	}
 	for(i=0;i<AUDIO_BUFFER_SIZE;i++) {
 		audioBufferRight[i] = 0;
 	}
+	
+	// reset the indices to the initial index. 
 	bufferLeftIndex = 0;
 	bufferRightIndex = AUDIO_TWO_SECONDS;
 	
