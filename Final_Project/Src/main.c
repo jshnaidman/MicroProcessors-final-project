@@ -31,7 +31,9 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 #define AUDIO_BUFFER_SIZE 2000 //2000 samples
+#define AUDIO_BUFFER_SIZE_8BIT 4000
 #define AUDIO_TWO_SECONDS 32000
+#define AUDIO_TWO_SECONDS_8BIT 64000
 #define TWO_PI_DIVIDED_BY_16000 0.00039269908
 
 /* USER CODE END PTD */
@@ -67,7 +69,7 @@ int rx_cplt=1;
 int tx_cplt=1;
 int cmd_cplt=1;
 int bufferLeftIndex = 0;
-int bufferRightIndex = AUDIO_TWO_SECONDS;
+int bufferRightIndex = AUDIO_TWO_SECONDS_8BIT;
 
 /* USER CODE END PV */
 
@@ -154,10 +156,10 @@ int main(void)
 		audioBufferLeft[i%AUDIO_BUFFER_SIZE] = (uint16_t) (normalizedSineOne*4095); // map between 0-4095
 		audioBufferRight[i%AUDIO_BUFFER_SIZE] = (uint16_t) (normalizedSineTwo*4095);
 		if (!((i+1)%AUDIO_BUFFER_SIZE)) {
-			BSP_QSPI_Write((uint8_t*) audioBufferLeft,bufferLeftIndex,2*AUDIO_BUFFER_SIZE); // write 2000 bytes at a time
-			BSP_QSPI_Write((uint8_t*) audioBufferRight,bufferRightIndex,2*AUDIO_BUFFER_SIZE);// to flash
-			bufferLeftIndex += 2*AUDIO_BUFFER_SIZE;
-			bufferRightIndex += 2*AUDIO_BUFFER_SIZE;
+			BSP_QSPI_Write((uint8_t*) audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE_8BIT); // write 2000 bytes at a time
+			BSP_QSPI_Write((uint8_t*) audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE_8BIT);// to flash
+			bufferLeftIndex += AUDIO_BUFFER_SIZE_8BIT;
+			bufferRightIndex += AUDIO_BUFFER_SIZE_8BIT;
 		}
 	}
 	
@@ -171,14 +173,14 @@ int main(void)
 	
 	// reset the indices to the initial index. 
 	bufferLeftIndex = 0;
-	bufferRightIndex = AUDIO_TWO_SECONDS;
+	bufferRightIndex = AUDIO_TWO_SECONDS_8BIT;
 	
 	// read from flash and store in buffer
-	BSP_QSPI_Read((uint8_t *) audioBufferLeft,bufferLeftIndex,2*AUDIO_BUFFER_SIZE);
-	BSP_QSPI_Read((uint8_t *) audioBufferRight,bufferRightIndex,2*AUDIO_BUFFER_SIZE);
+	BSP_QSPI_Read((uint8_t *) audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE_8BIT);
+	BSP_QSPI_Read((uint8_t *) audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE_8BIT);
 	
-	bufferRightIndex += 2*AUDIO_BUFFER_SIZE;
-	bufferLeftIndex += 2*AUDIO_BUFFER_SIZE;
+	bufferRightIndex += AUDIO_BUFFER_SIZE_8BIT;
+	bufferLeftIndex += AUDIO_BUFFER_SIZE_8BIT;
 	
 	// start DMA transfer to DAC
 	// These have callback functions which read from flash and store in audio buffers

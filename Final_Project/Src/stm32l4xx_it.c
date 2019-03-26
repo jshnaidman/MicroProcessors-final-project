@@ -56,6 +56,8 @@
 
 #define AUDIO_BUFFER_SIZE 2000
 #define AUDIO_TWO_SECONDS 32000
+#define AUDIO_TWO_SECONDS_8BIT 64000
+#define AUDIO_BUFFER_SIZE_8BIT 4000
 
 extern int rx_cplt;
 extern int tx_cplt;
@@ -306,16 +308,16 @@ void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
 	// read the first half of the audio buffer
 	BSP_QSPI_Read(audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE);
 	BSP_QSPI_Read(audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE);
-	bufferLeftIndex = (bufferLeftIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS; 
-	bufferRightIndex = (bufferRightIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS +AUDIO_TWO_SECONDS;
+	bufferLeftIndex = (bufferLeftIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS_8BIT; 
+	bufferRightIndex = (bufferRightIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS_8BIT +AUDIO_TWO_SECONDS_8BIT;
 }
 
 void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
 	// read the second half of the audio buffer
-		BSP_QSPI_Read(&audioBufferLeft[AUDIO_BUFFER_SIZE/2],bufferLeftIndex,AUDIO_BUFFER_SIZE);
-		BSP_QSPI_Read(&audioBufferRight[AUDIO_BUFFER_SIZE/2],bufferRightIndex,AUDIO_BUFFER_SIZE);
-		bufferLeftIndex = (bufferLeftIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS; 
-		bufferRightIndex = (bufferRightIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS + AUDIO_TWO_SECONDS;
+		BSP_QSPI_Read(&audioBufferLeft[AUDIO_BUFFER_SIZE],bufferLeftIndex,AUDIO_BUFFER_SIZE);
+		BSP_QSPI_Read(&audioBufferRight[AUDIO_BUFFER_SIZE],bufferRightIndex,AUDIO_BUFFER_SIZE);
+		bufferLeftIndex = (bufferLeftIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS_8BIT; 
+		bufferRightIndex = (bufferRightIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS_8BIT + AUDIO_TWO_SECONDS_8BIT;
 }
 
 
