@@ -303,19 +303,18 @@ void QUADSPI_IRQHandler(void)
 /* USER CODE BEGIN 1 */
 
 void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
-	// read the first half of the audio buffer
-	//BSP_QSPI_Read(audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE);
-	//BSP_QSPI_Read(audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE);
-	//bufferLeftIndex = (bufferLeftIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS; 
-	//bufferRightIndex = (bufferRightIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS +AUDIO_TWO_SECONDS;
+
 }
 
 void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
 	// read the second half of the audio buffer
-		BSP_QSPI_Read(audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE*2);
-		BSP_QSPI_Read(audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE*2);
-		bufferLeftIndex = (bufferLeftIndex + AUDIO_BUFFER_SIZE*2)%(AUDIO_TWO_SECONDS*2); 
-		bufferRightIndex = (bufferRightIndex + AUDIO_BUFFER_SIZE*2)%(AUDIO_TWO_SECONDS*2) + AUDIO_TWO_SECONDS*2;
+	BSP_QSPI_Read(audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE*2);
+	BSP_QSPI_Read(audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE*2);
+	
+	//located in flash from [0:63999]
+	bufferLeftIndex = (bufferLeftIndex + AUDIO_BUFFER_SIZE*2)%(AUDIO_TWO_SECONDS*2); 
+	//located in flash from [64000:128000]
+	bufferRightIndex = (bufferRightIndex + AUDIO_BUFFER_SIZE*2)%(AUDIO_TWO_SECONDS*2) + AUDIO_TWO_SECONDS*2; 
 }
 
 

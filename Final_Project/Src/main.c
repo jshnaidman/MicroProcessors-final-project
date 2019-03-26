@@ -130,10 +130,10 @@ int main(void)
 	BSP_QSPI_Erase_Chip(); // this can take like 30 seconds. 
 	
 	// matrix coefficients
-	int a11 = 1;
-	int a12 = 0;
-	int a21 = 1;
-	int a22 = 0;
+	float32_t a11 = 1.0;
+	float32_t a12 = 0.0;
+	float32_t a21 = 0.6;
+	float32_t a22 = 0.4;
 	float32_t sinOne,sinTwo;
 	float32_t normalizedSineOne, normalizedSineTwo;
 	float32_t angle1,angle2;
@@ -143,16 +143,16 @@ int main(void)
 	// create mixed signal and transfer over to flash
 	for(i=0;i<AUDIO_TWO_SECONDS;i++) {														
 		// 400 and 700 hz frequency spread over 16000 samples per second for two seconds
-		angle1 = TWO_PI_DIVIDED_BY_16000*((440*i));//overflows modularly
-		angle2 = TWO_PI_DIVIDED_BY_16000*((440*i));
-		sinOne = (arm_sin_f32(angle1)+1)*2047;
-		sinTwo = (arm_sin_f32(angle2)+1)*2047;
-		normalizedSineOne = (a11*sinOne + a12*sinTwo)/(a11+a12); // combine and normalize between 0 and 1
-		normalizedSineTwo = (a21*sinOne + a22*sinTwo)/(a21+a22);
-		audioBufferLeft[i%AUDIO_BUFFER_SIZE] = (uint16_t) (normalizedSineOne); // map between 0-4095
+		angle1 = TWO_PI_DIVIDED_BY_16000*((440*i));//A4 overflows modularly
+		angle2 = TWO_PI_DIVIDED_BY_16000*((698*i));//F5 overflows modularly
+		sinOne = (arm_sin_f32(angle1)+1)*2047;//[0:4094]
+		sinTwo = (arm_sin_f32(angle2)+1)*2047;//[0:4094]
+		normalizedSineOne = (a11*sinOne + a12*sinTwo)/(a11+a12); //mix and normalize
+		normalizedSineTwo = (a21*sinOne + a22*sinTwo)/(a21+a22); //mix and normalize
+		audioBufferLeft[i%AUDIO_BUFFER_SIZE] = (uint16_t) (normalizedSineOne);//assign to buffers
 		audioBufferRight[i%AUDIO_BUFFER_SIZE] = (uint16_t) (normalizedSineTwo);
 		if (!((i+1)%AUDIO_BUFFER_SIZE)) {
-			BSP_QSPI_Write((uint8_t*) audioBufferLeft,bufferLeftIndex,2*AUDIO_BUFFER_SIZE); // write 2000 bytes at a time
+			BSP_QSPI_Write((uint8_t*) audioBufferLeft,bufferLeftIndex,2*AUDIO_BUFFER_SIZE); // write 16000 bytes at a time
 			BSP_QSPI_Write((uint8_t*) audioBufferRight,bufferRightIndex,2*AUDIO_BUFFER_SIZE);// to flash
 			bufferLeftIndex += 2*AUDIO_BUFFER_SIZE;
 			bufferRightIndex += 2*AUDIO_BUFFER_SIZE;
@@ -169,7 +169,7 @@ int main(void)
 	
 	// reset the indices to the initial index. 
 	bufferLeftIndex = 0;
-	bufferRightIndex = AUDIO_TWO_SECONDS*2;
+	bufferRightIndex = AUDIO_TWO_SECONDS*2;//the index is multiplied by two due to the 16 to 8bit int array conversion 
 	
 	// read from flash and store in buffer
 	BSP_QSPI_Read((uint8_t *) audioBufferLeft,bufferLeftIndex,2*AUDIO_BUFFER_SIZE);
