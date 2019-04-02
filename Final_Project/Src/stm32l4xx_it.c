@@ -66,8 +66,8 @@ extern int cmd_cplt;
 extern int bufferLeftIndex;
 extern int bufferRightIndex;
 
-extern uint8_t audioBufferLeft[];
-extern uint8_t audioBufferRight[];
+extern float audioBufferLeft[];
+extern float audioBufferRight[];
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/

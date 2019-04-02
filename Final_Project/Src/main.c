@@ -32,8 +32,10 @@
 /* USER CODE BEGIN PTD */
 #define AUDIO_BUFFER_SIZE 2000 //2000 samples
 #define AUDIO_BUFFER_SIZE_8BIT 4000
+#define AUDIO_BUFFER_SIZE_FLOAT 8000
 #define AUDIO_TWO_SECONDS 32000
 #define AUDIO_TWO_SECONDS_8BIT 64000
+#define AUDIO_TWO_SECONDS_FLOAT 128000
 #define TWO_PI_DIVIDED_BY_16000 0.00039269908
 
 /* USER CODE END PTD */
@@ -62,14 +64,14 @@ TIM_HandleTypeDef htim6;
 
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
-uint16_t audioBufferLeft[AUDIO_BUFFER_SIZE];
-uint16_t audioBufferRight[AUDIO_BUFFER_SIZE];
+float audioBufferLeft[AUDIO_BUFFER_SIZE];
+float audioBufferRight[AUDIO_BUFFER_SIZE];
 int i;
 int rx_cplt=1;
 int tx_cplt=1;
 int cmd_cplt=1;
-int bufferLeftIndex = 0;
-int bufferRightIndex = AUDIO_TWO_SECONDS_8BIT;
+int bufferLeftIndex = 0; // this is the index of where the buffer is stored in flash
+int bufferRightIndex = AUDIO_TWO_SECONDS_8BIT; // this is the index of where the buffer is stored in flash
 
 /* USER CODE END PV */
 
@@ -136,30 +138,20 @@ int main(void)
 	int a12 = 0;
 	int a21 = 1;
 	int a22 = 0;
-	float32_t sinOne,sinTwo;
-	float32_t normalizedSineOne, normalizedSineTwo;
 	float32_t angle1,angle2;
-	uint16_t mixOne,mixTwo;
-	uint8_t mixOne1,mixOne2, mixTwo1,mixTwo2;
 	
 	// create mixed signal and transfer over to flash
 	for(i=0;i<AUDIO_TWO_SECONDS;i++) {														
 		// 400 and 700 hz frequency spread over 16000 samples per second for two seconds
 		angle1 = TWO_PI_DIVIDED_BY_16000*((400*i)%16000);
 		angle2 = TWO_PI_DIVIDED_BY_16000*((700*i)%16000);
-		sinOne = arm_sin_f32(angle1);
-		sinOne = sinOne+1; // maps from 0 to 2
-		sinTwo = arm_sin_f32(angle2);
-		sinTwo = sinTwo+1;
-		normalizedSineOne = (a11*sinOne + a12*sinTwo)/MAX(2*(a11+a12),1); // combine and normalize between 0 and 1
-		normalizedSineTwo = (a21*sinOne + a22*sinTwo)/MAX(2*(a21+a22),1);
-		audioBufferLeft[i%AUDIO_BUFFER_SIZE] = (uint16_t) (normalizedSineOne*4095); // map between 0-4095
-		audioBufferRight[i%AUDIO_BUFFER_SIZE] = (uint16_t) (normalizedSineTwo*4095);
+		audioBufferLeft[i%AUDIO_BUFFER_SIZE] = arm_sin_f32(angle1);
+		audioBufferRight[i%AUDIO_BUFFER_SIZE] = arm_sin_f32(angle2);
 		if (!((i+1)%AUDIO_BUFFER_SIZE)) {
-			BSP_QSPI_Write((uint8_t*) audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE_8BIT); // write 2000 bytes at a time
-			BSP_QSPI_Write((uint8_t*) audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE_8BIT);// to flash
-			bufferLeftIndex += AUDIO_BUFFER_SIZE_8BIT;
-			bufferRightIndex += AUDIO_BUFFER_SIZE_8BIT;
+			BSP_QSPI_Write((uint8_t*) audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE_FLOAT); // write 4000 bytes at a time
+			BSP_QSPI_Write((uint8_t*) audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE_FLOAT);// to flash
+			bufferLeftIndex += AUDIO_BUFFER_SIZE_FLOAT;
+			bufferRightIndex += AUDIO_BUFFER_SIZE_FLOAT;
 		}
 	}
 	
@@ -173,19 +165,20 @@ int main(void)
 	
 	// reset the indices to the initial index. 
 	bufferLeftIndex = 0;
-	bufferRightIndex = AUDIO_TWO_SECONDS_8BIT;
+	bufferRightIndex = AUDIO_TWO_SECONDS_FLOAT;
 	
 	// read from flash and store in buffer
-	BSP_QSPI_Read((uint8_t *) audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE_8BIT);
-	BSP_QSPI_Read((uint8_t *) audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE_8BIT);
+	BSP_QSPI_Read((uint8_t *) audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE_FLOAT);
+	BSP_QSPI_Read((uint8_t *) audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE_FLOAT);
+	BSP_QSPI_Read_DMA((uint8_t *) audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE_FLOAT);
 	
-	bufferRightIndex += AUDIO_BUFFER_SIZE_8BIT;
-	bufferLeftIndex += AUDIO_BUFFER_SIZE_8BIT;
+	bufferRightIndex += AUDIO_BUFFER_SIZE_FLOAT;
+	bufferLeftIndex += AUDIO_BUFFER_SIZE_FLOAT;
 	
 	// start DMA transfer to DAC
 	// These have callback functions which read from flash and store in audio buffers
-	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1,(uint32_t*)audioBufferLeft,AUDIO_BUFFER_SIZE, DAC_ALIGN_12B_R);
-	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2,(uint32_t*)audioBufferRight,AUDIO_BUFFER_SIZE, DAC_ALIGN_12B_R);
+//	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1,(uint32_t*)audioBufferLeft,AUDIO_BUFFER_SIZE, DAC_ALIGN_12B_R);
+//	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2,(uint32_t*)audioBufferRight,AUDIO_BUFFER_SIZE, DAC_ALIGN_12B_R);
 	
 
   /* USER CODE END 2 */
