@@ -32,6 +32,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "arm_math.h"
 
 /* USER CODE END Includes */
 
@@ -48,6 +49,17 @@ extern "C" {
 /* Exported macro ------------------------------------------------------------*/
 /* USER CODE BEGIN EM */
 
+#define AUDIO_BUFFER_SIZE 2000 //2000 samples
+#define AUDIO_BUFFER_SIZE_8BIT 4000
+#define AUDIO_BUFFER_SIZE_FLOAT 8000
+#define AUDIO_TWO_SECONDS 32000
+#define AUDIO_FOUR_SECONDS 2*AUDIO_TWO_SECONDS
+#define AUDIO_TWO_SECONDS_8BIT 64000 // number of bytes to represent 32000 samples of a 16 bit number
+#define AUDIO_TWO_SECONDS_FLOAT 128000 // number of bytes to represent 32000 samples of a float
+#define AUDIO_STORAGE_SIZE 2*AUDIO_TWO_SECONDS_FLOAT
+#define TWO_PI_DIVIDED_BY_16000 0.00039269908
+
+#define NUMBER_OF_AUDIO_BUFFERS_FOR_4_SECONDS_OF_AUDIO 32 // 64000/AUDIO_BUFFER_SIZE = 32
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/
@@ -59,6 +71,55 @@ void Error_Handler(void);
 
 /* Private defines -----------------------------------------------------------*/
 /* USER CODE BEGIN Private defines */
+
+//buffers
+float flashBuffer[AUDIO_BUFFER_SIZE];
+uint16_t audioBufferLeft[AUDIO_BUFFER_SIZE];
+uint16_t audioBufferRight[AUDIO_BUFFER_SIZE];
+
+// ############
+// matrices
+float matrixBuffer[AUDIO_BUFFER_SIZE];
+arm_matrix_instance_f32 matrix;
+
+float transposeBuffer[AUDIO_BUFFER_SIZE];
+arm_matrix_instance_f32 transposeMatrix;
+
+float meanMatrixBuffer[AUDIO_BUFFER_SIZE];
+arm_matrix_instance_f32 meanMatrix;
+
+float eigValueMatrixBuffer[4];
+arm_matrix_instance_f32 eigValueMatrix;
+
+float eigVectorMatrixBuffer[4];
+arm_matrix_instance_f32 eigVectorMatrix;
+
+float whiteningMatrixBuffer[4];
+arm_matrix_instance_f32 whiteningMatrix;
+
+float tempMatrixBuffer[4];
+arm_matrix_instance_f32 tempMatrix;
+
+float temp2MatrixBuffer[4];
+arm_matrix_instance_f32 temp2Matrix;
+
+float covarianceMatrixBuffer[4];
+arm_matrix_instance_f32 covarianceMatrix;
+// ############
+
+
+// flags
+int get_covariance=0;
+int rx_cplt=1;
+int tx_cplt=1;
+int cmd_cplt=1;
+int left_qspi=0;
+int right_qspi=0;
+int get_mean=1;
+int flashAddr = 0;
+
+int mu1 = 0;
+int mu2 = 0;
 
 /* USER CODE END Private defines */
 

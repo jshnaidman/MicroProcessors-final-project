@@ -30,18 +30,13 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-#define AUDIO_BUFFER_SIZE 2000 //2000 samples
-#define AUDIO_BUFFER_SIZE_8BIT 4000
-#define AUDIO_BUFFER_SIZE_FLOAT 8000
-#define AUDIO_TWO_SECONDS 32000
-#define AUDIO_TWO_SECONDS_8BIT 64000
-#define AUDIO_TWO_SECONDS_FLOAT 128000
-#define TWO_PI_DIVIDED_BY_16000 0.00039269908
 
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+int i;
 
 /* USER CODE END PD */
 
@@ -64,15 +59,6 @@ TIM_HandleTypeDef htim6;
 
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
-float audioBufferLeft[AUDIO_BUFFER_SIZE];
-float audioBufferRight[AUDIO_BUFFER_SIZE];
-int i;
-int rx_cplt=1;
-int tx_cplt=1;
-int cmd_cplt=1;
-int bufferLeftIndex = 0; // this is the index of where the buffer is stored in flash
-int bufferRightIndex = AUDIO_TWO_SECONDS_8BIT; // this is the index of where the buffer is stored in flash
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -88,6 +74,64 @@ static void MX_TIM6_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+void calculateCovariancePartial() {
+	arm_mat_sub_f32(&matrix,&meanMatrix,&matrix); // centralize matrix
+	arm_mat_trans_f32(&matrix, &transposeMatrix); // fills transpose matrix with transpose
+	arm_mat_mult_f32(&transposeMatrix, &matrix,&tempMatrix); // multiply transpose matrix with flash matrix, yielding 2 x 2 covariance matrix partial sum
+	arm_mat_add_f32(&tempMatrix, &covarianceMatrix,&covarianceMatrix); // add partial sum to total
+}
+
+
+// calculate eigenValues and eigenVectors
+void calculateEigen() {
+	float a = covarianceMatrixBuffer[0];
+	float b = covarianceMatrixBuffer[1];
+	float c = covarianceMatrixBuffer[2];
+	float d = covarianceMatrixBuffer[3];
+	
+	// calculate eigen values
+	float tr = a+d;
+	float tr2 = tr*tr;
+	float det = a*d - b*c;
+	
+	float root;
+	arm_sqrt_f32(tr2 - 4*det,&root);
+	
+	float eig1 = (tr + root )/2;
+	float eig2 = (tr - root )/2;
+	
+	// create eigenValue matrix
+	eigValueMatrixBuffer[0] = eig1;
+	eigValueMatrixBuffer[3] = eig2;
+	eigValueMatrixBuffer[1] = 0;
+	eigValueMatrixBuffer[2] = 0;
+	
+	// create eigenVector matrix
+	eigVectorMatrixBuffer[0] = a - eig1;
+	eigVectorMatrixBuffer[2] = c;
+	eigVectorMatrixBuffer[3] = d - eig2;
+	eigVectorMatrixBuffer[1] = b;
+	
+	
+	// normalize
+	float norm;
+	float temp = eigVectorMatrixBuffer[0]*eigVectorMatrixBuffer[0] + eigVectorMatrixBuffer[2]*eigVectorMatrixBuffer[2];
+	
+	arm_sqrt_f32(temp, &norm);
+	eigVectorMatrixBuffer[0] /= norm;
+	eigVectorMatrixBuffer[2] /= norm;
+	
+	temp = eigVectorMatrixBuffer[1]*eigVectorMatrixBuffer[1] + eigVectorMatrixBuffer[3]*eigVectorMatrixBuffer[3];
+	arm_sqrt_f32(temp, &norm);
+	eigVectorMatrixBuffer[1] /= norm;
+	eigValueMatrixBuffer[3] /= norm;
+}
+
+void getWhiteningMatrix() {
+	tempMatrixBuffer[0] = arm_sqrt_f32(ei
+	
+}
 
 /* USER CODE END 0 */
 
@@ -141,39 +185,73 @@ int main(void)
 	float32_t angle1,angle2;
 	
 	// create mixed signal and transfer over to flash
-	for(i=0;i<AUDIO_TWO_SECONDS;i++) {														
+	for(i=0;i<AUDIO_FOUR_SECONDS;i+=2) {														
 		// 400 and 700 hz frequency spread over 16000 samples per second for two seconds
 		angle1 = TWO_PI_DIVIDED_BY_16000*((400*i)%16000);
 		angle2 = TWO_PI_DIVIDED_BY_16000*((700*i)%16000);
-		audioBufferLeft[i%AUDIO_BUFFER_SIZE] = arm_sin_f32(angle1);
-		audioBufferRight[i%AUDIO_BUFFER_SIZE] = arm_sin_f32(angle2);
+		flashBuffer[i%AUDIO_BUFFER_SIZE] = arm_sin_f32(angle1); // EVEN FLASH ADDR IS THE FIRST SIGNAL
+		flashBuffer[(i+1)%AUDIO_BUFFER_SIZE] = arm_sin_f32(angle2); // ODD FLASH ADDR IS THE SECOND SIGNAL
 		if (!((i+1)%AUDIO_BUFFER_SIZE)) {
-			BSP_QSPI_Write((uint8_t*) audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE_FLOAT); // write 4000 bytes at a time
-			BSP_QSPI_Write((uint8_t*) audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE_FLOAT);// to flash
-			bufferLeftIndex += AUDIO_BUFFER_SIZE_FLOAT;
-			bufferRightIndex += AUDIO_BUFFER_SIZE_FLOAT;
+			BSP_QSPI_Write((uint8_t*) flashBuffer,flashAddr,AUDIO_BUFFER_SIZE_FLOAT); // write 4000 bytes at a time
+			flashAddr += AUDIO_BUFFER_SIZE_FLOAT;
 		}
 	}
 	
 	// this is here to demonstrate that buffers are cleared and it is really reading from flash
 	for(i=0;i<AUDIO_BUFFER_SIZE;i++) {
-		audioBufferLeft[i] = 0;
-	}
-	for(i=0;i<AUDIO_BUFFER_SIZE;i++) {
-		audioBufferRight[i] = 0;
+		flashBuffer[i] = 0;
 	}
 	
-	// reset the indices to the initial index. 
-	bufferLeftIndex = 0;
-	bufferRightIndex = AUDIO_TWO_SECONDS_FLOAT;
+	// reset the read addr from flash
+	flashAddr = 0;
 	
-	// read from flash and store in buffer
-	BSP_QSPI_Read((uint8_t *) audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE_FLOAT);
-	BSP_QSPI_Read((uint8_t *) audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE_FLOAT);
-	BSP_QSPI_Read_DMA((uint8_t *) audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE_FLOAT);
+	// get the mean
+	// since we are using DMA, there's no point using CMSIS since we're bottlenecked by the speed of reading from flash
+	while (flashAddr < AUDIO_STORAGE_SIZE) {
+		get_mean = 1; // set flag so that rxCallback knows which code to execute
+		BSP_QSPI_Read_DMA((uint8_t *) flashBuffer,flashAddr,AUDIO_BUFFER_SIZE_FLOAT);
+		while(get_mean); // wait for read to finish before calling next one
+	}
+	mu1 /= AUDIO_TWO_SECONDS; // This single division is surely faster than calling CMSIS for mean after using processor for QSPI
+	mu2 /= AUDIO_TWO_SECONDS;
 	
-	bufferRightIndex += AUDIO_BUFFER_SIZE_FLOAT;
-	bufferLeftIndex += AUDIO_BUFFER_SIZE_FLOAT;
+	
+	// mean matrix is 32000 by 2, even indices are first column, odd indices are second column.
+	for(i=0;i<AUDIO_BUFFER_SIZE;i++){ 
+		if (i%2) {
+			meanMatrixBuffer[i] = mu1; // init the meanMatrixBuffer with the means calculated
+		}
+		else {
+			meanMatrixBuffer[i] = mu2;
+		}
+	}
+	
+	arm_mat_init_f32(&matrix, AUDIO_BUFFER_SIZE, 2, covarianceMatrixBuffer); // AUDIO_BUFFER_SIZE x 2
+	arm_mat_init_f32(&transposeMatrix, 2, AUDIO_BUFFER_SIZE, covarianceMatrixBuffer); // 2 x AUDIO_BUFFER_SIZE
+	arm_mat_init_f32(&meanMatrix, AUDIO_BUFFER_SIZE, 2, meanMatrixBuffer); // to be subtracted from "matrix" to centralize it.
+	arm_mat_init_f32(&covarianceMatrix, 2, 2, covarianceMatrixBuffer);
+	arm_mat_init_f32(&tempMatrix, 2, 2, tempMatrixBuffer);
+	arm_mat_init_f32(&temp2Matrix, 2, 2, temp2MatrixBuffer);
+	arm_mat_init_f32(&eigValueMatrix, 2, 2, eigValueMatrixBuffer);
+	arm_mat_init_f32(&eigVectorMatrix, 2, 2, eigVectorMatrixBuffer);
+	arm_mat_init_f32(&whiteningMatrix, 2, 2, whiteningMatrixBuffer);
+	
+	flashAddr = 0; // reset the read addr from flash
+	
+	BSP_QSPI_Read_DMA( (uint8_t *) flashBuffer, flashAddr, AUDIO_BUFFER_SIZE_FLOAT);
+	 
+	while (flashAddr < AUDIO_STORAGE_SIZE) {
+		while (get_covariance); // wait for read to complete
+		get_covariance = 1; // set flag so that rxCallback knows which code to execute
+		BSP_QSPI_Read_DMA((uint8_t *) flashBuffer,flashAddr,AUDIO_BUFFER_SIZE_FLOAT); // start next DMA read
+		calculateCovariancePartial(); // calculate the covariance partial of what just completed
+	}
+	
+	arm_mat_scale_f32(&covarianceMatrix,AUDIO_FOUR_SECONDS,&covarianceMatrix); // divide by N to get covariance
+	
+	calculateEigen();
+	
+	
 	
 	// start DMA transfer to DAC
 	// These have callback functions which read from flash and store in audio buffers
