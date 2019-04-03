@@ -242,8 +242,8 @@ void HAL_QSPI_MspInit(QSPI_HandleTypeDef* hqspi)
     hdma_quadspi.Init.Direction = DMA_PERIPH_TO_MEMORY;
     hdma_quadspi.Init.PeriphInc = DMA_PINC_DISABLE;
     hdma_quadspi.Init.MemInc = DMA_MINC_ENABLE;
-    hdma_quadspi.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
-    hdma_quadspi.Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
+    hdma_quadspi.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
+    hdma_quadspi.Init.MemDataAlignment = DMA_MDATAALIGN_WORD;
     hdma_quadspi.Init.Mode = DMA_NORMAL;
     hdma_quadspi.Init.Priority = DMA_PRIORITY_LOW;
     if (HAL_DMA_Init(&hdma_quadspi) != HAL_OK)

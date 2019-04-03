@@ -24,6 +24,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "stm32l475e_iot01_qspi.h"
+#include "arm_math.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -54,20 +55,7 @@
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-#define AUDIO_BUFFER_SIZE 2000
-#define AUDIO_TWO_SECONDS 32000
-#define AUDIO_TWO_SECONDS_8BIT 64000
-#define AUDIO_BUFFER_SIZE_8BIT 4000
-
-extern int rx_cplt;
-extern int tx_cplt;
-extern int cmd_cplt;
-
-extern int bufferLeftIndex;
-extern int bufferRightIndex;
-
-extern float audioBufferLeft[];
-extern float audioBufferRight[];
+int i;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -306,18 +294,44 @@ void QUADSPI_IRQHandler(void)
 
 void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
 	// read the first half of the audio buffer
-	BSP_QSPI_Read(audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE);
-	BSP_QSPI_Read(audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE);
-	bufferLeftIndex = (bufferLeftIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS_8BIT; 
-	bufferRightIndex = (bufferRightIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS_8BIT +AUDIO_TWO_SECONDS_8BIT;
+//	BSP_QSPI_Read(audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE);
+//	BSP_QSPI_Read(audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE);
+//	bufferLeftIndex = (bufferLeftIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS_8BIT; 
+//	bufferRightIndex = (bufferRightIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS_8BIT +AUDIO_TWO_SECONDS_8BIT;
 }
 
 void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
 	// read the second half of the audio buffer
-		BSP_QSPI_Read(&audioBufferLeft[AUDIO_BUFFER_SIZE],bufferLeftIndex,AUDIO_BUFFER_SIZE);
-		BSP_QSPI_Read(&audioBufferRight[AUDIO_BUFFER_SIZE],bufferRightIndex,AUDIO_BUFFER_SIZE);
-		bufferLeftIndex = (bufferLeftIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS_8BIT; 
-		bufferRightIndex = (bufferRightIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS_8BIT + AUDIO_TWO_SECONDS_8BIT;
+//		BSP_QSPI_Read(&audioBufferLeft[AUDIO_BUFFER_SIZE],bufferLeftIndex,AUDIO_BUFFER_SIZE);
+//		BSP_QSPI_Read(&audioBufferRight[AUDIO_BUFFER_SIZE],bufferRightIndex,AUDIO_BUFFER_SIZE);
+//		bufferLeftIndex = (bufferLeftIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS_8BIT; 
+//		bufferRightIndex = (bufferRightIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS_8BIT + AUDIO_TWO_SECONDS_8BIT;
+}
+
+void HAL_QSPI_RxHalfCpltCallback(QSPI_HandleTypeDef *hqspi) {
+	if (get_mean) {
+		for(i=0;i<AUDIO_BUFFER_SIZE/2;i++) {
+			mean += audioBufferLeft[i];
+		}
+	}
+}
+
+void HAL_QSPI_RxCpltCallback(QSPI_HandleTypeDef *hqspi) {
+	if (get_mean) {
+		for(i=AUDIO_BUFFER_SIZE/2;i<AUDIO_BUFFER_SIZE;i++) {
+			mean += audioBufferLeft[i];
+		}
+		flashAddr += AUDIO_BUFFER_SIZE_FLOAT;
+		get_mean = 0;
+	}
+	
+	if (get_covariance) {
+		for (i=0;i<AUDIO_BUFFER_SIZE;i++) {
+			matrixBuffer[i] = flashBuffer[i];
+		}
+		flashAddr += AUDIO_BUFFER_SIZE_FLOAT;
+		get_covariance = 0;
+	}
 }
 
 
