@@ -26,6 +26,7 @@
 
 #include "stm32l475e_iot01_qspi.h"
 #include "arm_math.h"
+#include <stdlib.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -58,6 +59,7 @@ TIM_HandleTypeDef htim6;
 /* USER CODE BEGIN PV */
 
 #define MAX(a,b) (((a)>(b))?(a):(b))
+#define EPSILON 0.001
 
 /* USER CODE END PV */
 
@@ -76,10 +78,22 @@ static void MX_TIM6_Init(void);
 /* USER CODE BEGIN 0 */
 
 void calculateCovariancePartial() {
-	arm_mat_sub_f32(&matrix,&meanMatrix,&matrix); // centralize matrix
-	arm_mat_trans_f32(&matrix, &transposeMatrix); // fills transpose matrix with transpose
-	arm_mat_mult_f32(&transposeMatrix, &matrix,&tempMatrix); // multiply transpose matrix with flash matrix, yielding 2 x 2 covariance matrix partial sum
+	arm_mat_sub_f32(&matrix,&meanMatrix,&tempMatrix); // centralize matrix
+	for(int i=0;i<4;i++) { matrixBuffer[i] = tempMatrixBuffer[i];} // 
+	arm_mat_trans_f32(&matrix, &matrix2); // fills transpose matrix with transpose
+	arm_mat_mult_f32(&matrix2, &matrix,&tempMatrix); // multiply transpose matrix with flash matrix, yielding 2 x 2 covariance matrix partial sum
 	arm_mat_add_f32(&tempMatrix, &covarianceMatrix,&covarianceMatrix); // add partial sum to total
+}
+
+void getNorm(float arr[], int size, float* norm) {
+	float sum;
+	
+	for(int i=0;i<size;i++) {
+		sum += arr[i]*arr[i];
+	}
+	
+	arm_sqrt_f32(sum,norm);
+	
 }
 
 
@@ -129,8 +143,13 @@ void calculateEigen() {
 }
 
 void getWhiteningMatrix() {
-	tempMatrixBuffer[0] = arm_sqrt_f32(ei
-	
+	arm_sqrt_f32(eigValueMatrixBuffer[0],&whiteningMatrixBuffer[0]);
+	whiteningMatrixBuffer[1] = 0;
+	arm_sqrt_f32(eigValueMatrixBuffer[3],&whiteningMatrixBuffer[3]);
+	whiteningMatrixBuffer[2] = 0;
+	arm_mat_inverse_f32(&whiteningMatrix,&tempMatrix); // store inverse of root eigenvalue matrix in temp
+	arm_mat_inverse_f32(&eigVectorMatrix,&temp2Matrix); // store inverse of eigenvector matrix in temp2
+	arm_mat_mult_f32(&tempMatrix, &temp2Matrix, &whiteningMatrix);
 }
 
 /* USER CODE END 0 */
@@ -226,8 +245,8 @@ int main(void)
 		}
 	}
 	
-	arm_mat_init_f32(&matrix, AUDIO_BUFFER_SIZE, 2, covarianceMatrixBuffer); // AUDIO_BUFFER_SIZE x 2
-	arm_mat_init_f32(&transposeMatrix, 2, AUDIO_BUFFER_SIZE, covarianceMatrixBuffer); // 2 x AUDIO_BUFFER_SIZE
+	arm_mat_init_f32(&matrix, AUDIO_BUFFER_SIZE, 2, matrixBuffer); // AUDIO_BUFFER_SIZE x 2
+	arm_mat_init_f32(&matrix2, 2, AUDIO_BUFFER_SIZE, matrix2Buffer); // 2 x AUDIO_BUFFER_SIZE
 	arm_mat_init_f32(&meanMatrix, AUDIO_BUFFER_SIZE, 2, meanMatrixBuffer); // to be subtracted from "matrix" to centralize it.
 	arm_mat_init_f32(&covarianceMatrix, 2, 2, covarianceMatrixBuffer);
 	arm_mat_init_f32(&tempMatrix, 2, 2, tempMatrixBuffer);
@@ -235,6 +254,9 @@ int main(void)
 	arm_mat_init_f32(&eigValueMatrix, 2, 2, eigValueMatrixBuffer);
 	arm_mat_init_f32(&eigVectorMatrix, 2, 2, eigVectorMatrixBuffer);
 	arm_mat_init_f32(&whiteningMatrix, 2, 2, whiteningMatrixBuffer);
+	arm_mat_init_f32(&weightMatrix, 2, 1, weightMatrixBuffer);
+	arm_mat_init_f32(&weightOldMatrix, 2, 1, weightOldMatrixBuffer);
+	arm_mat_init_f32(&temp2by1Matrix,2,1,temp2by1MatrixBuffer);
 	
 	flashAddr = 0; // reset the read addr from flash
 	
@@ -251,6 +273,45 @@ int main(void)
 	
 	calculateEigen();
 	
+	getWhiteningMatrix();
+	
+	arm_mat_init_f32(&matrix2, 2, AUDIO_BUFFER_SIZE, matrix2Buffer); // 2 x AUDIO_BUFFER_SIZE
+	
+	float norm;
+	
+	temp2by1MatrixBuffer[0] = rand();
+	temp2by1MatrixBuffer[1] = rand();
+	
+	getNorm(temp2by1MatrixBuffer,2,&norm);
+	arm_mat_scale_f32(&temp2by1Matrix,1/norm,&weightMatrix); // normalize the weight matrix
+	weightOldMatrixBuffer[0] = 0;
+	weightOldMatrixBuffer[1] = 0;
+	
+	
+	
+	for(i=0;i<1000;i++) {
+		
+		// test for convergence
+		temp2by1MatrixBuffer[0] = weightMatrixBuffer[0] - weightOldMatrixBuffer[0];
+		temp2by1MatrixBuffer[1] = weightMatrixBuffer[1] - weightOldMatrixBuffer[1];
+		getNorm(temp2by1MatrixBuffer,2,&norm);
+		if(norm < EPSILON) {
+			break; 
+		}
+		temp2by1MatrixBuffer[0] = weightMatrixBuffer[0] + weightOldMatrixBuffer[0];
+		temp2by1MatrixBuffer[1] = weightMatrixBuffer[1] + weightOldMatrixBuffer[1];
+		getNorm(temp2by1MatrixBuffer,2,&norm);
+		if(norm < EPSILON) {
+			break; 
+		}
+		
+		// update the weight
+		weightOldMatrixBuffer[0] = weightMatrixBuffer[0]; // store old weight
+		weightOldMatrixBuffer[1] = weightMatrixBuffer[1];
+		
+		
+		
+	}
 	
 	
 	// start DMA transfer to DAC

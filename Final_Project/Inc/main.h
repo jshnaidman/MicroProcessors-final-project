@@ -82,8 +82,8 @@ uint16_t audioBufferRight[AUDIO_BUFFER_SIZE];
 float matrixBuffer[AUDIO_BUFFER_SIZE];
 arm_matrix_instance_f32 matrix;
 
-float transposeBuffer[AUDIO_BUFFER_SIZE];
-arm_matrix_instance_f32 transposeMatrix;
+float matrix2Buffer[AUDIO_BUFFER_SIZE];
+arm_matrix_instance_f32 matrix2;
 
 float meanMatrixBuffer[AUDIO_BUFFER_SIZE];
 arm_matrix_instance_f32 meanMatrix;
@@ -96,6 +96,15 @@ arm_matrix_instance_f32 eigVectorMatrix;
 
 float whiteningMatrixBuffer[4];
 arm_matrix_instance_f32 whiteningMatrix;
+
+float weightMatrixBuffer[2];
+arm_matrix_instance_f32 weightMatrix;
+
+float weightOldMatrixBuffer[2];
+arm_matrix_instance_f32 weightOldMatrix;
+
+float temp2by1MatrixBuffer[2];
+arm_matrix_instance_f32 temp2by1Matrix;
 
 float tempMatrixBuffer[4];
 arm_matrix_instance_f32 tempMatrix;
