@@ -319,6 +319,10 @@ int main(void)
 		}
 	}
 	
+	// IMPORTANT TO KNOW: In flash, it's stored as a 32000x2 matrix, meaning it goes sig1, sig2, sig1, sig2. Every 2 values is a row. This is so that when we read from flash
+	// we get both signals. Otherwise, we'd only get the first signal from a single read and would need to do 2 reads every time we processed info because they'd be in different 
+	// places in flash, and we'd also have to keep track of these indices which would be complicated. 
+	
 	arm_mat_init_f32(&matrix, ROW_SIZE, 2, matrixBuffer); // ROW_SIZE x 2
 	arm_mat_init_f32(&matrix2, ROW_SIZE, 2, matrix2Buffer); // ROW_SIZE x 2
 	arm_mat_init_f32(&transposeMatrix, 2, ROW_SIZE, transposeMatrixBuffer); // 2 x ROW_SIZE
@@ -455,11 +459,10 @@ int main(void)
 	BSP_QSPI_Read_DMA((uint8_t *) flashBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // start next DMA read
 	while (read_flash); // wait for read to complete
 	// start DMA transfer to DAC
-	// These have callback functions which read from flash and store in audio buffers
 	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1,(uint32_t*)audioBufferLeft,AUDIO_SAMPLE_SIZE, DAC_ALIGN_12B_R);
 	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2,(uint32_t*)audioBufferRight,AUDIO_SAMPLE_SIZE, DAC_ALIGN_12B_R);
 	
-		// max value recorded needs to be adjusted by offset that will be applied later to normalize it
+	// max value recorded needs to be adjusted by offset that will be applied later to normalize it
 	maxVal1 -= minVal1;
 	maxVal2 -= minVal2;
 
