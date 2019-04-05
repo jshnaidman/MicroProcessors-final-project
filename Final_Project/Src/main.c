@@ -40,7 +40,7 @@
 int i;
 
 //buffers
-float flashBuffer[AUDIO_SAMPLE_SIZE];
+float32_t flashBuffer[AUDIO_SAMPLE_SIZE];
 uint16_t audioBufferLeft[AUDIO_SAMPLE_SIZE];
 uint16_t audioBufferRight[AUDIO_SAMPLE_SIZE];
 
@@ -122,8 +122,8 @@ int right_qspi=0;
 int get_mean=1;
 int flashAddr = 0;
 
-int mu1 = 0;
-int mu2 = 0;
+float32_t mu1 = 0;
+float32_t mu2 = 0;
 float maxVal1 = -INFINITY;
 float minVal1 = INFINITY;
 float maxVal2 = -INFINITY;
@@ -265,7 +265,9 @@ int main(void)
 	HAL_TIM_Base_Start(&htim6);
 	
 	BSP_QSPI_Init();
-	BSP_QSPI_Erase_Chip(); // this can take like 30 seconds. 
+	int reload=1;	//set reload to 0 to save time if flash memory is already filled
+
+	if(reload)BSP_QSPI_Erase_Chip(); // this can take like 30 seconds. 
 	
 	// matrix coefficients
 	int a11 = 1;
@@ -276,6 +278,7 @@ int main(void)
 	float32_t sinOne,sinTwo;
 	
 	// create mixed signal and transfer over to flash
+	if(reload)
 	for(i=0;i<AUDIO_FOUR_SECONDS;i+=2) {														
 		// 400 and 700 hz frequency spread over 16000 samples per second for two seconds
 		angle1 = TWO_PI_DIVIDED_BY_16000*((400*i)%16000);
@@ -284,7 +287,7 @@ int main(void)
 		sinTwo = arm_sin_f32(angle2); // ODD FLASH ADDR IS THE SECOND SIGNAL
 		flashBuffer[i%AUDIO_SAMPLE_SIZE] = (a11*sinOne + a12*sinTwo)/(a11+a12); // combine and normalize between 0 and 1
 		flashBuffer[(i+1)%AUDIO_SAMPLE_SIZE] = (a21*sinOne + a22*sinTwo)/(a21+a22);
-		if (!((i+1)%AUDIO_SAMPLE_SIZE)) {
+		if (!((i+2)%AUDIO_SAMPLE_SIZE)) {
 			BSP_QSPI_Write((uint8_t*) flashBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // write 4000 bytes at a time
 			flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
 		}
@@ -302,7 +305,9 @@ int main(void)
 	// since we are using DMA, there's no point using CMSIS since we're bottlenecked by the speed of reading from flash
 	while (flashAddr < AUDIO_STORAGE_SIZE) {
 		get_mean = 1; // set flag so that rxCallback knows which code to execute
+	
 		BSP_QSPI_Read_DMA((uint8_t *) flashBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT);
+
 		while(get_mean); // wait for read to finish before calling next one
 	}
 	mu1 /= AUDIO_TWO_SECONDS; // This single division is surely faster than calling CMSIS for mean after using processor for QSPI
@@ -312,10 +317,10 @@ int main(void)
 	// mean matrix is 32000 by 2, even indices are first column, odd indices are second column.
 	for(i=0;i<AUDIO_SAMPLE_SIZE;i++){ 
 		if (i%2) {
-			meanMatrixBuffer[i] = mu1; // init the meanMatrixBuffer with the means calculated
+			meanMatrixBuffer[i] = mu2; // init the meanMatrixBuffer with the means calculated
 		}
 		else {
-			meanMatrixBuffer[i] = mu2;
+			meanMatrixBuffer[i] = mu1;
 		}
 	}
 	

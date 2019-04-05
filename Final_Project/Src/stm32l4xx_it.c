@@ -42,8 +42,8 @@ extern int right_qspi;
 extern int get_mean;
 extern int flashAddr;
 
-extern int mu1;
-extern int mu2;
+extern float mu1;
+extern float mu2;
 extern float maxVal1;
 extern float minVal1;
 extern float maxVal2;
@@ -324,10 +324,10 @@ void HAL_QSPI_RxHalfCpltCallback(QSPI_HandleTypeDef *hqspi) {
 	if (get_mean) {
 		for(j=0;j<AUDIO_SAMPLE_SIZE/2;j++) {
 			if (j%2) {
-				mu1 += audioBufferLeft[j];
+				mu2 = flashBuffer[j];
 			}
 			else {
-				mu2 += audioBufferLeft[j];
+				mu1 = flashBuffer[j];
 			}
 		}
 	}
@@ -337,10 +337,10 @@ void HAL_QSPI_RxCpltCallback(QSPI_HandleTypeDef *hqspi) {
 	if (get_mean) {
 		for(j=AUDIO_SAMPLE_SIZE/2;j<AUDIO_SAMPLE_SIZE;j++) {
 			if (j%2) {
-				mu1 += audioBufferLeft[j];
+				mu2 += flashBuffer[j];
 			}
 			else {
-				mu2 += audioBufferLeft[j];
+				mu1 += flashBuffer[j];
 			}
 		}
 		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
