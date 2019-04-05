@@ -30,6 +30,28 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN TD */
 
+
+
+extern int read_flash_find_min_max;
+extern int read_flash;
+extern int rx_cplt;
+extern int tx_cplt;
+extern int cmd_cplt;
+extern int left_qspi;
+extern int right_qspi;
+extern int get_mean;
+extern int flashAddr;
+
+extern int mu1;
+extern int mu2;
+extern float maxVal1;
+extern float minVal1;
+extern float maxVal2;
+extern float minVal2;
+
+extern uint16_t audioBufferLeft[];
+extern float matrixBuffer[];
+extern float flashBuffer[];
 /* USER CODE END TD */
 
 /* Private define ------------------------------------------------------------*/
@@ -55,7 +77,7 @@
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-int i;
+int j;
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
@@ -292,30 +314,20 @@ void QUADSPI_IRQHandler(void)
 
 /* USER CODE BEGIN 1 */
 
-void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
-	// read the first half of the audio buffer
-//	BSP_QSPI_Read(audioBufferLeft,bufferLeftIndex,AUDIO_BUFFER_SIZE);
-//	BSP_QSPI_Read(audioBufferRight,bufferRightIndex,AUDIO_BUFFER_SIZE);
-//	bufferLeftIndex = (bufferLeftIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS_8BIT; 
-//	bufferRightIndex = (bufferRightIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS_8BIT +AUDIO_TWO_SECONDS_8BIT;
-}
+//void HAL_DAC_ConvHalfCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
+//}
 
-void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
-	// read the second half of the audio buffer
-//		BSP_QSPI_Read(&audioBufferLeft[AUDIO_BUFFER_SIZE],bufferLeftIndex,AUDIO_BUFFER_SIZE);
-//		BSP_QSPI_Read(&audioBufferRight[AUDIO_BUFFER_SIZE],bufferRightIndex,AUDIO_BUFFER_SIZE);
-//		bufferLeftIndex = (bufferLeftIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS_8BIT; 
-//		bufferRightIndex = (bufferRightIndex + AUDIO_BUFFER_SIZE)%AUDIO_TWO_SECONDS_8BIT + AUDIO_TWO_SECONDS_8BIT;
-}
+//void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
+//}
 
 void HAL_QSPI_RxHalfCpltCallback(QSPI_HandleTypeDef *hqspi) {
 	if (get_mean) {
-		for(i=0;i<AUDIO_BUFFER_SIZE/2;i++) {
-			if (i%2) {
-				mu1 += audioBufferLeft[i];
+		for(j=0;j<AUDIO_SAMPLE_SIZE/2;j++) {
+			if (j%2) {
+				mu1 += audioBufferLeft[j];
 			}
 			else {
-				mu2 += audioBufferLeft[i];
+				mu2 += audioBufferLeft[j];
 			}
 		}
 	}
@@ -323,24 +335,39 @@ void HAL_QSPI_RxHalfCpltCallback(QSPI_HandleTypeDef *hqspi) {
 
 void HAL_QSPI_RxCpltCallback(QSPI_HandleTypeDef *hqspi) {
 	if (get_mean) {
-		for(i=AUDIO_BUFFER_SIZE/2;i<AUDIO_BUFFER_SIZE;i++) {
-			if (i%2) {
-				mu1 += audioBufferLeft[i];
+		for(j=AUDIO_SAMPLE_SIZE/2;j<AUDIO_SAMPLE_SIZE;j++) {
+			if (j%2) {
+				mu1 += audioBufferLeft[j];
 			}
 			else {
-				mu2 += audioBufferLeft[i];
+				mu2 += audioBufferLeft[j];
 			}
 		}
-		flashAddr += AUDIO_BUFFER_SIZE_FLOAT;
+		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
 		get_mean = 0;
 	}
 	
-	if (get_covariance) {
-		for (i=0;i<AUDIO_BUFFER_SIZE;i++) {
-			matrixBuffer[i] = flashBuffer[i];
+	if (read_flash) {
+		for (j=0;j<AUDIO_SAMPLE_SIZE;j++) {
+			matrixBuffer[j] = flashBuffer[j];
 		}
-		flashAddr += AUDIO_BUFFER_SIZE_FLOAT;
-		get_covariance = 0;
+		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
+		read_flash = 0;
+	}
+	if (read_flash_find_min_max) {
+		for (j=0;j<AUDIO_SAMPLE_SIZE;j++) {
+			matrixBuffer[j] = flashBuffer[j];
+			if (j%2) {
+				if(matrixBuffer[j] > maxVal1) maxVal1 = matrixBuffer[j];
+				if(matrixBuffer[j] < minVal1) minVal1 = matrixBuffer[j];
+			}
+			else {
+				if(matrixBuffer[j] > maxVal2) maxVal2 = matrixBuffer[j];
+				if(matrixBuffer[j] < minVal2) minVal2 = matrixBuffer[j];
+			}
+		}
+		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
+		read_flash_find_min_max = 0;
 	}
 }
 

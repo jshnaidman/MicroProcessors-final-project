@@ -35,6 +35,10 @@ final_project\stm32l4xx_it.o: ../Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_
 final_project\stm32l4xx_it.o: ../Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_qspi.h
 final_project\stm32l4xx_it.o: ../Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_tim.h
 final_project\stm32l4xx_it.o: ../Drivers/STM32L4xx_HAL_Driver/Inc/stm32l4xx_hal_tim_ex.h
+final_project\stm32l4xx_it.o: ../Drivers/CMSIS/Include/arm_math.h
+final_project\stm32l4xx_it.o: ../Drivers/CMSIS/Include/core_cm4.h
+final_project\stm32l4xx_it.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\string.h
+final_project\stm32l4xx_it.o: C:\Keil_v5\ARM\ARMCC\Bin\..\include\math.h
 final_project\stm32l4xx_it.o: ../Inc/stm32l4xx_it.h
 final_project\stm32l4xx_it.o: ../Drivers/B-L475E-IOT01/Inc/stm32l475e_iot01_qspi.h
 final_project\stm32l4xx_it.o: ../Drivers/B-L475E-IOT01/Inc/../Components/mx25r6435f/mx25r6435f.h

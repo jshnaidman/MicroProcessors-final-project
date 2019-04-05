@@ -39,6 +39,96 @@
 
 int i;
 
+//buffers
+float flashBuffer[AUDIO_SAMPLE_SIZE];
+uint16_t audioBufferLeft[AUDIO_SAMPLE_SIZE];
+uint16_t audioBufferRight[AUDIO_SAMPLE_SIZE];
+
+// ############
+// matrices
+float matrixBuffer[AUDIO_SAMPLE_SIZE];
+arm_matrix_instance_f32 matrix;
+
+float matrix2Buffer[AUDIO_SAMPLE_SIZE];
+arm_matrix_instance_f32 matrix2;
+
+float transposeMatrixBuffer[AUDIO_SAMPLE_SIZE];
+arm_matrix_instance_f32 transposeMatrix;
+
+float meanMatrixBuffer[AUDIO_SAMPLE_SIZE];
+arm_matrix_instance_f32 meanMatrix;
+
+float whiteMatrixBuffer[AUDIO_SAMPLE_SIZE];
+arm_matrix_instance_f32 whiteMatrix;
+
+float singleRowMatrixBuffer[AUDIO_SAMPLE_SIZE];
+arm_matrix_instance_f32 singleRowMatrix;
+
+float singleColMatrixBuffer[AUDIO_SAMPLE_SIZE];
+arm_matrix_instance_f32 singleColMatrix;
+
+float singleCol2MatrixBuffer[AUDIO_SAMPLE_SIZE];
+arm_matrix_instance_f32 singleCol2Matrix;
+
+float singleCol3MatrixBuffer[AUDIO_SAMPLE_SIZE];
+arm_matrix_instance_f32 singleCol3Matrix;
+
+float eigValueMatrixBuffer[4];
+arm_matrix_instance_f32 eigValueMatrix;
+
+float temp2by2MatrixBuffer[4];
+arm_matrix_instance_f32 temp2by2Matrix;
+
+float icaFilterMatrixBuffer[4];
+arm_matrix_instance_f32 icaFilterMatrix;
+
+float eigVectorMatrixBuffer[4];
+arm_matrix_instance_f32 eigVectorMatrix;
+
+float whiteningMatrixBuffer[4];
+arm_matrix_instance_f32 whiteningMatrix;
+
+float weightMatrixBuffer[2];
+arm_matrix_instance_f32 weightMatrix;
+
+float weightOldMatrixBuffer[2];
+arm_matrix_instance_f32 weightOldMatrix;
+
+float temp2by1MatrixBuffer[2];
+arm_matrix_instance_f32 temp2by1Matrix;
+
+float secondTemp2by1MatrixBuffer[2];
+arm_matrix_instance_f32 secondTemp2by1Matrix;
+
+float thirdTemp2by1MatrixBuffer[2];
+arm_matrix_instance_f32 thirdTemp2by1Matrix;
+
+float tempMatrixBuffer[4];
+arm_matrix_instance_f32 tempMatrix;
+
+float temp2MatrixBuffer[4];
+arm_matrix_instance_f32 temp2Matrix;
+
+float covarianceMatrixBuffer[4];
+arm_matrix_instance_f32 covarianceMatrix;
+
+int read_flash_find_min_max=0;
+int read_flash=0;
+int rx_cplt=1;
+int tx_cplt=1;
+int cmd_cplt=1;
+int left_qspi=0;
+int right_qspi=0;
+int get_mean=1;
+int flashAddr = 0;
+
+int mu1 = 0;
+int mu2 = 0;
+float maxVal1 = -INFINITY;
+float minVal1 = INFINITY;
+float maxVal2 = -INFINITY;
+float minVal2 = INFINITY;
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -77,19 +167,11 @@ static void MX_TIM6_Init(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-void calculateCovariancePartial() {
-	arm_mat_sub_f32(&matrix,&meanMatrix,&tempMatrix); // centralize matrix
-	for(int i=0;i<4;i++) { matrixBuffer[i] = tempMatrixBuffer[i];} // 
-	arm_mat_trans_f32(&matrix, &matrix2); // fills transpose matrix with transpose
-	arm_mat_mult_f32(&matrix2, &matrix,&tempMatrix); // multiply transpose matrix with flash matrix, yielding 2 x 2 covariance matrix partial sum
-	arm_mat_add_f32(&tempMatrix, &covarianceMatrix,&covarianceMatrix); // add partial sum to total
-}
-
 void getNorm(float arr[], int size, float* norm) {
 	float sum;
 	
-	for(int i=0;i<size;i++) {
-		sum += arr[i]*arr[i];
+	for(int j=0;j<size;j++) {
+		sum += arr[j]*arr[j];
 	}
 	
 	arm_sqrt_f32(sum,norm);
@@ -142,16 +224,6 @@ void calculateEigen() {
 	eigValueMatrixBuffer[3] /= norm;
 }
 
-void getWhiteningMatrix() {
-	arm_sqrt_f32(eigValueMatrixBuffer[0],&whiteningMatrixBuffer[0]);
-	whiteningMatrixBuffer[1] = 0;
-	arm_sqrt_f32(eigValueMatrixBuffer[3],&whiteningMatrixBuffer[3]);
-	whiteningMatrixBuffer[2] = 0;
-	arm_mat_inverse_f32(&whiteningMatrix,&tempMatrix); // store inverse of root eigenvalue matrix in temp
-	arm_mat_inverse_f32(&eigVectorMatrix,&temp2Matrix); // store inverse of eigenvector matrix in temp2
-	arm_mat_mult_f32(&tempMatrix, &temp2Matrix, &whiteningMatrix);
-}
-
 /* USER CODE END 0 */
 
 /**
@@ -162,7 +234,6 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
 	QSPI_CommandTypeDef sCommand;
-	HAL_StatusTypeDef status;
 
   /* USER CODE END 1 */
 
@@ -202,22 +273,25 @@ int main(void)
 	int a21 = 1;
 	int a22 = 0;
 	float32_t angle1,angle2;
+	float32_t sinOne,sinTwo;
 	
 	// create mixed signal and transfer over to flash
 	for(i=0;i<AUDIO_FOUR_SECONDS;i+=2) {														
 		// 400 and 700 hz frequency spread over 16000 samples per second for two seconds
 		angle1 = TWO_PI_DIVIDED_BY_16000*((400*i)%16000);
 		angle2 = TWO_PI_DIVIDED_BY_16000*((700*i)%16000);
-		flashBuffer[i%AUDIO_BUFFER_SIZE] = arm_sin_f32(angle1); // EVEN FLASH ADDR IS THE FIRST SIGNAL
-		flashBuffer[(i+1)%AUDIO_BUFFER_SIZE] = arm_sin_f32(angle2); // ODD FLASH ADDR IS THE SECOND SIGNAL
-		if (!((i+1)%AUDIO_BUFFER_SIZE)) {
-			BSP_QSPI_Write((uint8_t*) flashBuffer,flashAddr,AUDIO_BUFFER_SIZE_FLOAT); // write 4000 bytes at a time
-			flashAddr += AUDIO_BUFFER_SIZE_FLOAT;
+		sinOne = arm_sin_f32(angle1); // EVEN FLASH ADDR IS THE FIRST SIGNAL
+		sinTwo = arm_sin_f32(angle2); // ODD FLASH ADDR IS THE SECOND SIGNAL
+		flashBuffer[i%AUDIO_SAMPLE_SIZE] = (a11*sinOne + a12*sinTwo)/(a11+a12); // combine and normalize between 0 and 1
+		flashBuffer[(i+1)%AUDIO_SAMPLE_SIZE] = (a21*sinOne + a22*sinTwo)/(a21+a22);
+		if (!((i+1)%AUDIO_SAMPLE_SIZE)) {
+			BSP_QSPI_Write((uint8_t*) flashBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // write 4000 bytes at a time
+			flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
 		}
 	}
 	
 	// this is here to demonstrate that buffers are cleared and it is really reading from flash
-	for(i=0;i<AUDIO_BUFFER_SIZE;i++) {
+	for(i=0;i<AUDIO_SAMPLE_SIZE;i++) {
 		flashBuffer[i] = 0;
 	}
 	
@@ -228,7 +302,7 @@ int main(void)
 	// since we are using DMA, there's no point using CMSIS since we're bottlenecked by the speed of reading from flash
 	while (flashAddr < AUDIO_STORAGE_SIZE) {
 		get_mean = 1; // set flag so that rxCallback knows which code to execute
-		BSP_QSPI_Read_DMA((uint8_t *) flashBuffer,flashAddr,AUDIO_BUFFER_SIZE_FLOAT);
+		BSP_QSPI_Read_DMA((uint8_t *) flashBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT);
 		while(get_mean); // wait for read to finish before calling next one
 	}
 	mu1 /= AUDIO_TWO_SECONDS; // This single division is surely faster than calling CMSIS for mean after using processor for QSPI
@@ -236,7 +310,7 @@ int main(void)
 	
 	
 	// mean matrix is 32000 by 2, even indices are first column, odd indices are second column.
-	for(i=0;i<AUDIO_BUFFER_SIZE;i++){ 
+	for(i=0;i<AUDIO_SAMPLE_SIZE;i++){ 
 		if (i%2) {
 			meanMatrixBuffer[i] = mu1; // init the meanMatrixBuffer with the means calculated
 		}
@@ -245,46 +319,68 @@ int main(void)
 		}
 	}
 	
-	arm_mat_init_f32(&matrix, AUDIO_BUFFER_SIZE, 2, matrixBuffer); // AUDIO_BUFFER_SIZE x 2
-	arm_mat_init_f32(&matrix2, 2, AUDIO_BUFFER_SIZE, matrix2Buffer); // 2 x AUDIO_BUFFER_SIZE
-	arm_mat_init_f32(&meanMatrix, AUDIO_BUFFER_SIZE, 2, meanMatrixBuffer); // to be subtracted from "matrix" to centralize it.
+	arm_mat_init_f32(&matrix, ROW_SIZE, 2, matrixBuffer); // ROW_SIZE x 2
+	arm_mat_init_f32(&matrix2, ROW_SIZE, 2, matrix2Buffer); // ROW_SIZE x 2
+	arm_mat_init_f32(&transposeMatrix, 2, ROW_SIZE, transposeMatrixBuffer); // 2 x ROW_SIZE
+	arm_mat_init_f32(&meanMatrix, ROW_SIZE, 2, meanMatrixBuffer); // to be subtracted from "matrix" to centralize it.
 	arm_mat_init_f32(&covarianceMatrix, 2, 2, covarianceMatrixBuffer);
-	arm_mat_init_f32(&tempMatrix, 2, 2, tempMatrixBuffer);
-	arm_mat_init_f32(&temp2Matrix, 2, 2, temp2MatrixBuffer);
+	arm_mat_init_f32(&tempMatrix, ROW_SIZE, 2, tempMatrixBuffer);
+	arm_mat_init_f32(&temp2Matrix, ROW_SIZE, 2, temp2MatrixBuffer);
 	arm_mat_init_f32(&eigValueMatrix, 2, 2, eigValueMatrixBuffer);
 	arm_mat_init_f32(&eigVectorMatrix, 2, 2, eigVectorMatrixBuffer);
 	arm_mat_init_f32(&whiteningMatrix, 2, 2, whiteningMatrixBuffer);
 	arm_mat_init_f32(&weightMatrix, 2, 1, weightMatrixBuffer);
 	arm_mat_init_f32(&weightOldMatrix, 2, 1, weightOldMatrixBuffer);
 	arm_mat_init_f32(&temp2by1Matrix,2,1,temp2by1MatrixBuffer);
+	arm_mat_init_f32(&secondTemp2by1Matrix,2,1,secondTemp2by1MatrixBuffer);
+	arm_mat_init_f32(&thirdTemp2by1Matrix,2,1,thirdTemp2by1MatrixBuffer);
+	arm_mat_init_f32(&whiteMatrix,ROW_SIZE,2,whiteMatrixBuffer);
+	arm_mat_init_f32(&singleColMatrix,AUDIO_SAMPLE_SIZE,1,singleColMatrixBuffer); // AUDIO_SAMPLE_SIZE x 1
+	arm_mat_init_f32(&singleCol2Matrix,AUDIO_SAMPLE_SIZE,1,singleCol2MatrixBuffer); // AUDIO_SAMPLE_SIZE x 1
+	arm_mat_init_f32(&singleCol3Matrix,AUDIO_SAMPLE_SIZE,1,singleCol3MatrixBuffer); // AUDIO_SAMPLE_SIZE x 1
+	arm_mat_init_f32(&temp2by2Matrix,2,2,temp2by2MatrixBuffer); // 2x2
+	arm_mat_init_f32(&icaFilterMatrix,2,2,icaFilterMatrixBuffer); // 2x2
 	
 	flashAddr = 0; // reset the read addr from flash
 	
-	BSP_QSPI_Read_DMA( (uint8_t *) flashBuffer, flashAddr, AUDIO_BUFFER_SIZE_FLOAT);
+	BSP_QSPI_Read_DMA( (uint8_t *) flashBuffer, flashAddr, AUDIO_SAMPLE_SIZE_FLOAT);
 	 
 	while (flashAddr < AUDIO_STORAGE_SIZE) {
-		while (get_covariance); // wait for read to complete
-		get_covariance = 1; // set flag so that rxCallback knows which code to execute
-		BSP_QSPI_Read_DMA((uint8_t *) flashBuffer,flashAddr,AUDIO_BUFFER_SIZE_FLOAT); // start next DMA read
-		calculateCovariancePartial(); // calculate the covariance partial of what just completed
+		while (read_flash_find_min_max); // wait for read to complete
+		read_flash_find_min_max = 1; // set flag so that rxCallback knows which code to execute. Find min and max of signal for later
+		BSP_QSPI_Read_DMA((uint8_t *) flashBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // start next DMA read
+		
+		// calculate the covariance matrix for this chunk
+		arm_mat_sub_f32(&matrix,&meanMatrix,&tempMatrix); // centralize matrix (need to store in temp because we can't write where we read from)
+		arm_mat_trans_f32(&tempMatrix, &transposeMatrix); // fills transpose matrix with transpose (2x32000)
+		arm_mat_mult_f32(&transposeMatrix, &tempMatrix,&matrix); // multiply transpose matrix with centralized input matrix -> 2x32000 x 32000x2 ~ 2x2
+		arm_mat_add_f32(&matrix, &covarianceMatrix,&tempMatrix); // add partial sum to total 
+		for(i=0;i<4;i++) { covarianceMatrixBuffer[i] = tempMatrixBuffer[i]; } // store total in covarianceMatrix (this may be unnecessary or can be optimized to use different buffer every time to eliminate copying)
 	}
 	
-	arm_mat_scale_f32(&covarianceMatrix,AUDIO_FOUR_SECONDS,&covarianceMatrix); // divide by N to get covariance
+	arm_mat_scale_f32(&covarianceMatrix,AUDIO_TWO_SECONDS,&covarianceMatrix); // divide by N to get covariance
 	
 	calculateEigen();
 	
-	getWhiteningMatrix();
+	// get the whitening matrix
 	
-	arm_mat_init_f32(&matrix2, 2, AUDIO_BUFFER_SIZE, matrix2Buffer); // 2 x AUDIO_BUFFER_SIZE
+	// take the square root of the eigenvalues
+	arm_sqrt_f32(eigValueMatrixBuffer[0],&whiteningMatrixBuffer[0]);
+	whiteningMatrixBuffer[1] = 0;
+	arm_sqrt_f32(eigValueMatrixBuffer[3],&whiteningMatrixBuffer[3]);
+	whiteningMatrixBuffer[2] = 0;
+	arm_mat_inverse_f32(&whiteningMatrix,&tempMatrix); // store inverse of root eigenvalue matrix in temp
+	arm_mat_inverse_f32(&eigVectorMatrix,&temp2Matrix); // store inverse of eigenvector matrix in temp2
+	arm_mat_mult_f32(&tempMatrix, &temp2Matrix, &whiteningMatrix);
 	
 	float norm;
 	
-	temp2by1MatrixBuffer[0] = rand();
-	temp2by1MatrixBuffer[1] = rand();
+	temp2by1MatrixBuffer[0] = rand()%100; // use modulo 100 so that the integer isn't too large which can make computation lengthy
+	temp2by1MatrixBuffer[1] = rand()%100; // use modulo 100 so that the integer isn't too large which can make computation lengthy
 	
 	getNorm(temp2by1MatrixBuffer,2,&norm);
-	arm_mat_scale_f32(&temp2by1Matrix,1/norm,&weightMatrix); // normalize the weight matrix
-	weightOldMatrixBuffer[0] = 0;
+	arm_mat_scale_f32(&temp2by1Matrix,(1/norm),&weightMatrix); // normalize the weight matrix
+	weightOldMatrixBuffer[0] = 0; //init oldWeight to 0
 	weightOldMatrixBuffer[1] = 0;
 	
 	
@@ -292,33 +388,80 @@ int main(void)
 	for(i=0;i<1000;i++) {
 		
 		// test for convergence
-		temp2by1MatrixBuffer[0] = weightMatrixBuffer[0] - weightOldMatrixBuffer[0];
-		temp2by1MatrixBuffer[1] = weightMatrixBuffer[1] - weightOldMatrixBuffer[1];
+		arm_sub_f32(weightMatrixBuffer,weightOldMatrixBuffer,temp2by1MatrixBuffer,2);
 		getNorm(temp2by1MatrixBuffer,2,&norm);
 		if(norm < EPSILON) {
 			break; 
 		}
-		temp2by1MatrixBuffer[0] = weightMatrixBuffer[0] + weightOldMatrixBuffer[0];
-		temp2by1MatrixBuffer[1] = weightMatrixBuffer[1] + weightOldMatrixBuffer[1];
+		arm_add_f32(weightMatrixBuffer,weightOldMatrixBuffer,temp2by1MatrixBuffer,2);
 		getNorm(temp2by1MatrixBuffer,2,&norm);
 		if(norm < EPSILON) {
 			break; 
 		}
 		
-		// update the weight
+		// store the weight into oldWeight
 		weightOldMatrixBuffer[0] = weightMatrixBuffer[0]; // store old weight
 		weightOldMatrixBuffer[1] = weightMatrixBuffer[1];
 		
+		// set weight to 0
+		weightMatrixBuffer[0] = 0;
+		weightMatrixBuffer[1] = 0;
 		
-		
+		// update the weight chunk by chunk
+		BSP_QSPI_Read_DMA( (uint8_t *) flashBuffer, flashAddr, AUDIO_SAMPLE_SIZE_FLOAT);
+		while (flashAddr < AUDIO_STORAGE_SIZE) {
+			while (read_flash); // wait for read to complete
+			read_flash = 1; // set flag so that rxCallback knows which code to execute
+			BSP_QSPI_Read_DMA((uint8_t *) flashBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // start next DMA read
+			
+			// white_mat = center_mat' * whitening_mat
+			// in the case that DMA finishes before calculations are all done, never use "matrix" after we have matrix2, which is the centralized matrix
+			arm_mat_sub_f32(&matrix,&meanMatrix,&matrix2); // centralize matrix, matrix2=center_mat (need to store in temp because we can't write where we read from)
+			arm_mat_mult_f32(&matrix2,&whiteningMatrix,&whiteMatrix); // white matrix is transpose of jerry's whiteMatrix cuz of how we store it
+																														// whitening_mat * center_mat = (center_mat' * whitening_mat)' since whitening_mat is symmetric
+			
+			arm_mat_mult_f32(&whiteMatrix,&weightMatrix,&singleColMatrix); // white_mat * weight ~ ROW_SIZEx1
+			
+			// take result to the third power
+			arm_mult_f32(singleColMatrixBuffer,singleColMatrixBuffer,singleCol2MatrixBuffer, AUDIO_SAMPLE_SIZE);
+			arm_mult_f32(singleColMatrixBuffer,singleCol2MatrixBuffer,singleCol3MatrixBuffer, AUDIO_SAMPLE_SIZE);
+			
+			arm_mat_trans_f32(&whiteMatrix, &transposeMatrix); // fills transposeMatrix with transpose of whiteMatrix
+			
+			// transpose is first argument because we store it in memory as "transpose" already
+			arm_mat_mult_f32(&transposeMatrix,&singleCol3Matrix, &temp2by1Matrix); // 2xROW_SIZE * ROW_SIZEx1 ~ 2x1
+			
+			arm_scale_f32(temp2by1MatrixBuffer,ONE_OVER_TOTAL_SAMPLE_SIZE,secondTemp2by1MatrixBuffer,2); // divide by num_samples
+			arm_scale_f32(weightMatrixBuffer,3,temp2by1MatrixBuffer,2); // 3*weight
+			arm_sub_f32(secondTemp2by1MatrixBuffer,temp2by1MatrixBuffer,thirdTemp2by1MatrixBuffer,2); // finish weight update for this chunk
+			arm_add_f32(thirdTemp2by1MatrixBuffer,weightMatrixBuffer, secondTemp2by1MatrixBuffer, 2); // add chunnk to total (can't write to weightMatrixBuffer directly since we are reading from there)
+			for(i=0;i<4;i++) { weightMatrixBuffer[i] = secondTemp2by1MatrixBuffer[i]; } // store total in weightMatrixBuffer 
+		}
+		// normalize the weight
+			getNorm(thirdTemp2by1MatrixBuffer,2,&norm);
+			arm_scale_f32(thirdTemp2by1MatrixBuffer,(1/norm),weightMatrixBuffer,2);
 	}
 	
+	// create basis set transpose after weights have converged
+	// if weight matrix is [a;b] then basis set is [a -b; b a], and basis set transpose is therefore [a b; -b a]
+	temp2by2MatrixBuffer[0] = weightMatrixBuffer[0];
+	temp2by2MatrixBuffer[1] = weightMatrixBuffer[1];
+	temp2by2MatrixBuffer[2] = -weightMatrixBuffer[1];
+	temp2by2MatrixBuffer[3] = weightMatrixBuffer[0];
 	
+	arm_mat_mult_f32(&temp2by2Matrix,&whiteningMatrix,&icaFilterMatrix);
+	
+	read_flash = 1;
+	BSP_QSPI_Read_DMA((uint8_t *) flashBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // start next DMA read
+	while (read_flash); // wait for read to complete
 	// start DMA transfer to DAC
 	// These have callback functions which read from flash and store in audio buffers
-//	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1,(uint32_t*)audioBufferLeft,AUDIO_BUFFER_SIZE, DAC_ALIGN_12B_R);
-//	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2,(uint32_t*)audioBufferRight,AUDIO_BUFFER_SIZE, DAC_ALIGN_12B_R);
+	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1,(uint32_t*)audioBufferLeft,AUDIO_SAMPLE_SIZE, DAC_ALIGN_12B_R);
+	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2,(uint32_t*)audioBufferRight,AUDIO_SAMPLE_SIZE, DAC_ALIGN_12B_R);
 	
+		// max value recorded needs to be adjusted by offset that will be applied later to normalize it
+	maxVal1 -= minVal1;
+	maxVal2 -= minVal2;
 
   /* USER CODE END 2 */
 
@@ -327,7 +470,28 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-
+		
+		if (flashAddr >= AUDIO_STORAGE_SIZE) {
+			flashAddr = 0;
+		}
+		while (read_flash); // wait for read to complete
+		read_flash = 1; // set flag so that rxCallback knows which code to execute
+		BSP_QSPI_Read_DMA( (uint8_t *) flashBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // start next DMA read
+		arm_mat_trans_f32(&matrix, &transposeMatrix); // fills transposeMatrix with transpose of matrix. Need to do this because stored as transpose in memory
+		arm_mat_mult_f32(&icaFilterMatrix,&transposeMatrix,&matrix2); // store result of filtering in matrix2 which is 2xROW_SIZE
+		// store signal as 0-4095 in DAC buffer
+		for (i=0;i<ROW_SIZE;i++) {
+			matrix2Buffer[i] -= minVal1;
+			matrix2Buffer[i] *= (4095/maxVal1);
+			audioBufferLeft[i] = matrix2Buffer[i];
+		}
+		for (i=ROW_SIZE;i<AUDIO_SAMPLE_SIZE;i++) {
+			matrix2Buffer[i] -= minVal2;
+			matrix2Buffer[i] *= (4095/maxVal2);
+			audioBufferRight[i] = matrix2Buffer[i];
+		}
+		
+		
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
