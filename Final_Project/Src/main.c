@@ -199,29 +199,29 @@ void calculateEigen() {
 	
 	// create eigenValue matrix
 	eigValueMatrixBuffer[0] = eig1;
+  eigValueMatrixBuffer[1] = 0;
+  eigValueMatrixBuffer[2] = 0;
 	eigValueMatrixBuffer[3] = eig2;
-	eigValueMatrixBuffer[1] = 0;
-	eigValueMatrixBuffer[2] = 0;
+
 	
 	// create eigenVector matrix
 	eigVectorMatrixBuffer[0] = a - eig1;
+  eigVectorMatrixBuffer[1] = b;
 	eigVectorMatrixBuffer[2] = c;
 	eigVectorMatrixBuffer[3] = d - eig2;
-	eigVectorMatrixBuffer[1] = b;
 	
 	
-	// normalize
+	// normalize first row
 	float norm;
 	float temp = eigVectorMatrixBuffer[0]*eigVectorMatrixBuffer[0] + eigVectorMatrixBuffer[2]*eigVectorMatrixBuffer[2];
-	
 	arm_sqrt_f32(temp, &norm);
 	eigVectorMatrixBuffer[0] /= norm;
 	eigVectorMatrixBuffer[2] /= norm;
-	
+	// normalize second row
 	temp = eigVectorMatrixBuffer[1]*eigVectorMatrixBuffer[1] + eigVectorMatrixBuffer[3]*eigVectorMatrixBuffer[3];
 	arm_sqrt_f32(temp, &norm);
 	eigVectorMatrixBuffer[1] /= norm;
-	eigValueMatrixBuffer[3] /= norm;
+	eigVectorMatrixBuffer[3] /= norm;
 }
 
 /* USER CODE END 0 */
