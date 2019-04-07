@@ -265,7 +265,7 @@ int main(void)
 	HAL_TIM_Base_Start(&htim6);
 	
 	BSP_QSPI_Init();
-	int reload=1;	//set reload to 0 to save time if flash memory is already filled
+	int reload=0;	//set reload to 0 to save time if flash memory is already filled
 
 	if(reload)BSP_QSPI_Erase_Chip(); // this can take like 30 seconds. 
 	

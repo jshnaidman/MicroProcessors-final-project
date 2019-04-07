@@ -320,22 +320,9 @@ void QUADSPI_IRQHandler(void)
 //void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
 //}
 
-void HAL_QSPI_RxHalfCpltCallback(QSPI_HandleTypeDef *hqspi) {
-	if (get_mean) {
-		for(j=0;j<AUDIO_SAMPLE_SIZE/2;j++) {
-			if (j%2) {
-				mu2 = flashBuffer[j];
-			}
-			else {
-				mu1 = flashBuffer[j];
-			}
-		}
-	}
-}
-
 void HAL_QSPI_RxCpltCallback(QSPI_HandleTypeDef *hqspi) {
 	if (get_mean) {
-		for(j=AUDIO_SAMPLE_SIZE/2;j<AUDIO_SAMPLE_SIZE;j++) {
+		for(j=0;j<AUDIO_SAMPLE_SIZE;j++) {
 			if (j%2) {
 				mu2 += flashBuffer[j];
 			}
