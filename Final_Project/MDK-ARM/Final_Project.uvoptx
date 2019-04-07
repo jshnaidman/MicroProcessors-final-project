@@ -152,50 +152,34 @@
         <Bp>
           <Number>0</Number>
           <Type>0</Type>
-          <LineNumber>250</LineNumber>
+          <LineNumber>370</LineNumber>
           <EnabledFlag>1</EnabledFlag>
-          <Address>134223252</Address>
+          <Address>134238144</Address>
           <ByteObject>0</ByteObject>
           <HtxType>0</HtxType>
           <ManyObjects>0</ManyObjects>
           <SizeOfObject>0</SizeOfObject>
           <BreakByAccess>0</BreakByAccess>
           <BreakIfRCount>1</BreakIfRCount>
-          <Filename>..\Drivers\B-L475E-IOT01\Src\stm32l475e_iot01_qspi.c</Filename>
+          <Filename>../Src/main.c</Filename>
           <ExecCommand></ExecCommand>
-          <Expression>\\Final_Project\../Drivers/B-L475E-IOT01/Src/stm32l475e_iot01_qspi.c\250</Expression>
+          <Expression>\\Final_Project\../Src/main.c\370</Expression>
         </Bp>
         <Bp>
           <Number>1</Number>
           <Type>0</Type>
-          <LineNumber>309</LineNumber>
+          <LineNumber>363</LineNumber>
           <EnabledFlag>1</EnabledFlag>
-          <Address>134235882</Address>
+          <Address>134237822</Address>
           <ByteObject>0</ByteObject>
           <HtxType>0</HtxType>
           <ManyObjects>0</ManyObjects>
           <SizeOfObject>0</SizeOfObject>
           <BreakByAccess>0</BreakByAccess>
           <BreakIfRCount>1</BreakIfRCount>
-          <Filename>../Src/stm32l4xx_it.c</Filename>
+          <Filename>../Src/main.c</Filename>
           <ExecCommand></ExecCommand>
-          <Expression>\\Final_Project\../Src/stm32l4xx_it.c\309</Expression>
-        </Bp>
-        <Bp>
-          <Number>2</Number>
-          <Type>0</Type>
-          <LineNumber>248</LineNumber>
-          <EnabledFlag>1</EnabledFlag>
-          <Address>0</Address>
-          <ByteObject>0</ByteObject>
-          <HtxType>0</HtxType>
-          <ManyObjects>0</ManyObjects>
-          <SizeOfObject>0</SizeOfObject>
-          <BreakByAccess>0</BreakByAccess>
-          <BreakIfRCount>0</BreakIfRCount>
-          <Filename>..\Drivers\B-L475E-IOT01\Src\stm32l475e_iot01_qspi.c</Filename>
-          <ExecCommand></ExecCommand>
-          <Expression></Expression>
+          <Expression>\\Final_Project\../Src/main.c\363</Expression>
         </Bp>
       </Breakpoint>
       <WatchWindow1>
@@ -207,17 +191,17 @@
         <Ww>
           <count>1</count>
           <WinNumber>1</WinNumber>
-          <ItemText>get_mean</ItemText>
+          <ItemText>mu1</ItemText>
         </Ww>
         <Ww>
           <count>2</count>
           <WinNumber>1</WinNumber>
-          <ItemText>_RBYTE(0x20000161)</ItemText>
+          <ItemText>mu2</ItemText>
         </Ww>
         <Ww>
           <count>3</count>
           <WinNumber>1</WinNumber>
-          <ItemText>_RBYTE(0x20015A89)</ItemText>
+          <ItemText>read_flash_find_min_max</ItemText>
         </Ww>
       </WatchWindow1>
       <MemoryWindow1>

@@ -265,7 +265,7 @@ int main(void)
 	HAL_TIM_Base_Start(&htim6);
 	
 	BSP_QSPI_Init();
-	int reload=0;	//set reload to 0 to save time if flash memory is already filled
+	int reload=1;	//set reload to 0 to save time if flash memory is already filled
 
 	if(reload)BSP_QSPI_Erase_Chip(); // this can take like 30 seconds. 
 	
@@ -353,7 +353,7 @@ int main(void)
 	flashAddr = 0; // reset the read addr from flash
 	
 	BSP_QSPI_Read_DMA( (uint8_t *) flashBuffer, flashAddr, AUDIO_SAMPLE_SIZE_FLOAT);
-	 
+	read_flash_find_min_max=1;
 	while (flashAddr < AUDIO_STORAGE_SIZE) {
 		while (read_flash_find_min_max); // wait for read to complete
 		read_flash_find_min_max = 1; // set flag so that rxCallback knows which code to execute. Find min and max of signal for later
