@@ -265,7 +265,7 @@ int main(void)
 	HAL_TIM_Base_Start(&htim6);
 	
 	BSP_QSPI_Init();
-	int reload=1;	//set reload to 0 to save time if flash memory is already filled
+	int reload=0;	//set reload to 0 to save time if flash memory is already filled
 
 	if(reload)BSP_QSPI_Erase_Chip(); // this can take like 30 seconds. 
 	
@@ -352,13 +352,19 @@ int main(void)
 	
 	flashAddr = 0; // reset the read addr from flash
 	
-	BSP_QSPI_Read_DMA( (uint8_t *) flashBuffer, flashAddr, AUDIO_SAMPLE_SIZE_FLOAT);
-	read_flash_find_min_max=1;
 	while (flashAddr < AUDIO_STORAGE_SIZE) {
-		while (read_flash_find_min_max); // wait for read to complete
-		read_flash_find_min_max = 1; // set flag so that rxCallback knows which code to execute. Find min and max of signal for later
-		BSP_QSPI_Read_DMA((uint8_t *) flashBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // start next DMA read
-		
+		BSP_QSPI_Read((uint8_t *) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // start next DMA read
+		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
+		for(i=0;i<AUDIO_SAMPLE_SIZE;i++) {
+			if (i%2) {
+				if(matrixBuffer[i] > maxVal1) maxVal1 = matrixBuffer[i];
+				if(matrixBuffer[i] < minVal1) minVal1 = matrixBuffer[i];
+			}
+			else {
+				if(matrixBuffer[i] > maxVal2) maxVal2 = matrixBuffer[i];
+				if(matrixBuffer[i] < minVal2) minVal2 = matrixBuffer[i];
+			}
+		}
 		// calculate the covariance matrix for this chunk
 		arm_mat_sub_f32(&matrix,&meanMatrix,&tempMatrix); // centralize matrix (need to store in temp because we can't write where we read from)
 		arm_mat_trans_f32(&tempMatrix, &transposeMatrix); // fills transpose matrix with transpose (2x32000)

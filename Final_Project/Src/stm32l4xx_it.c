@@ -113,7 +113,6 @@ void NMI_Handler(void)
 void HardFault_Handler(void)
 {
   /* USER CODE BEGIN HardFault_IRQn 0 */
-
   /* USER CODE END HardFault_IRQn 0 */
   while (1)
   {
@@ -354,7 +353,6 @@ void HAL_QSPI_RxCpltCallback(QSPI_HandleTypeDef *hqspi) {
 			}
 		}
 		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
-		read_flash_find_min_max = 0;
 	}
 }
 
