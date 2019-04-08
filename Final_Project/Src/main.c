@@ -385,7 +385,7 @@ int main(void)
 	arm_sqrt_f32(eigValueMatrixBuffer[3],&whiteningMatrixBuffer[3]);
 	whiteningMatrixBuffer[2] = 0;
 	arm_mat_inverse_f32(&whiteningMatrix,&tempMatrix); // store inverse of root eigenvalue matrix in temp
-	arm_mat_inverse_f32(&eigVectorMatrix,&temp2Matrix); // store inverse of eigenvector matrix in temp2
+	arm_mat_trans_f32(&eigVectorMatrix,&temp2Matrix); // store inverse of eigenvector matrix in temp2
 	arm_mat_mult_f32(&tempMatrix, &temp2Matrix, &whiteningMatrix);
 	
 	float norm;
