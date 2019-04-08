@@ -444,7 +444,7 @@ int main(void)
 			arm_scale_f32(weightMatrixBuffer,3,temp2by1MatrixBuffer,2); // 3*weight
 			arm_sub_f32(secondTemp2by1MatrixBuffer,temp2by1MatrixBuffer,thirdTemp2by1MatrixBuffer,2); // finish weight update for this chunk
 			arm_add_f32(thirdTemp2by1MatrixBuffer,weightMatrixBuffer, secondTemp2by1MatrixBuffer, 2); // add chunnk to total (can't write to weightMatrixBuffer directly since we are reading from there)
-			for(i=0;i<4;i++) { weightMatrixBuffer[i] = secondTemp2by1MatrixBuffer[i]; } // store total in weightMatrixBuffer 
+			for(int j=0;j<4;j++) { weightMatrixBuffer[i] = secondTemp2by1MatrixBuffer[i]; } // store total in weightMatrixBuffer 
 		}
 		// normalize the weight
 			getNorm(thirdTemp2by1MatrixBuffer,2,&norm);
