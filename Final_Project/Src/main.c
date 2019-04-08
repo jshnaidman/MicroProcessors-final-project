@@ -40,7 +40,6 @@
 int i;
 
 //buffers
-float32_t flashBuffer[AUDIO_SAMPLE_SIZE];
 uint16_t audioBufferLeft[AUDIO_SAMPLE_SIZE];
 uint16_t audioBufferRight[AUDIO_SAMPLE_SIZE];
 
@@ -285,17 +284,17 @@ int main(void)
 		angle2 = TWO_PI_DIVIDED_BY_16000*((700*i)%16000);
 		sinOne = arm_sin_f32(angle1); // EVEN FLASH ADDR IS THE FIRST SIGNAL
 		sinTwo = arm_sin_f32(angle2); // ODD FLASH ADDR IS THE SECOND SIGNAL
-		flashBuffer[i%AUDIO_SAMPLE_SIZE] = (a11*sinOne + a12*sinTwo)/(a11+a12); // combine and normalize between 0 and 1
-		flashBuffer[(i+1)%AUDIO_SAMPLE_SIZE] = (a21*sinOne + a22*sinTwo)/(a21+a22);
+		matrixBuffer[i%AUDIO_SAMPLE_SIZE] = (a11*sinOne + a12*sinTwo)/(a11+a12); // combine and normalize between 0 and 1
+		matrixBuffer[(i+1)%AUDIO_SAMPLE_SIZE] = (a21*sinOne + a22*sinTwo)/(a21+a22);
 		if (!((i+2)%AUDIO_SAMPLE_SIZE)) {
-			BSP_QSPI_Write((uint8_t*) flashBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // write 4000 bytes at a time
+			BSP_QSPI_Write((uint8_t*) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // write 4000 bytes at a time
 			flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
 		}
 	}
 	
 	// this is here to demonstrate that buffers are cleared and it is really reading from flash
 	for(i=0;i<AUDIO_SAMPLE_SIZE;i++) {
-		flashBuffer[i] = 0;
+		matrixBuffer[i] = 0;
 	}
 	
 	// reset the read addr from flash
@@ -305,10 +304,16 @@ int main(void)
 	// since we are using DMA, there's no point using CMSIS since we're bottlenecked by the speed of reading from flash
 	while (flashAddr < AUDIO_STORAGE_SIZE) {
 		get_mean = 1; // set flag so that rxCallback knows which code to execute
-	
-		BSP_QSPI_Read_DMA((uint8_t *) flashBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT);
-
-		while(get_mean); // wait for read to finish before calling next one
+		BSP_QSPI_Read((uint8_t *) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT);
+		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
+		for(int j=0;j<AUDIO_SAMPLE_SIZE;j++) {
+			if (j%2) {
+				mu2 += matrixBuffer[j];
+			}
+			else {
+				mu1 += matrixBuffer[j];
+			}
+		}
 	}
 	mu1 /= AUDIO_TWO_SECONDS; // This single division is surely faster than calling CMSIS for mean after using processor for QSPI
 	mu2 /= AUDIO_TWO_SECONDS;
@@ -423,12 +428,9 @@ int main(void)
 		weightMatrixBuffer[1] = 0;
 		
 		// update the weight chunk by chunk
-		BSP_QSPI_Read_DMA( (uint8_t *) flashBuffer, flashAddr, AUDIO_SAMPLE_SIZE_FLOAT);
 		while (flashAddr < AUDIO_STORAGE_SIZE) {
-			while (read_flash); // wait for read to complete
-			read_flash = 1; // set flag so that rxCallback knows which code to execute
-			BSP_QSPI_Read_DMA((uint8_t *) flashBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // start next DMA read
-			
+			BSP_QSPI_Read( (uint8_t *) matrixBuffer, flashAddr, AUDIO_SAMPLE_SIZE_FLOAT);
+			flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
 			// white_mat = center_mat' * whitening_mat
 			// in the case that DMA finishes before calculations are all done, never use "matrix" after we have matrix2, which is the centralized matrix
 			arm_mat_sub_f32(&matrix,&meanMatrix,&matrix2); // centralize matrix, matrix2=center_mat (need to store in temp because we can't write where we read from)
@@ -466,9 +468,8 @@ int main(void)
 	
 	arm_mat_mult_f32(&temp2by2Matrix,&whiteningMatrix,&icaFilterMatrix);
 	
-	read_flash = 1;
-	BSP_QSPI_Read_DMA((uint8_t *) flashBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // start next DMA read
-	while (read_flash); // wait for read to complete
+	BSP_QSPI_Read((uint8_t *) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // read next 2000 samples
+	flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
 	// start DMA transfer to DAC
 	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1,(uint32_t*)audioBufferLeft,AUDIO_SAMPLE_SIZE, DAC_ALIGN_12B_R);
 	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2,(uint32_t*)audioBufferRight,AUDIO_SAMPLE_SIZE, DAC_ALIGN_12B_R);
@@ -488,9 +489,8 @@ int main(void)
 		if (flashAddr >= AUDIO_STORAGE_SIZE) {
 			flashAddr = 0;
 		}
-		while (read_flash); // wait for read to complete
-		read_flash = 1; // set flag so that rxCallback knows which code to execute
-		BSP_QSPI_Read_DMA( (uint8_t *) flashBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // start next DMA read
+		BSP_QSPI_Read( (uint8_t *) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // read next 2000 samples
+		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
 		arm_mat_trans_f32(&matrix, &transposeMatrix); // fills transposeMatrix with transpose of matrix. Need to do this because stored as transpose in memory
 		arm_mat_mult_f32(&icaFilterMatrix,&transposeMatrix,&matrix2); // store result of filtering in matrix2 which is 2xROW_SIZE
 		// store signal as 0-4095 in DAC buffer

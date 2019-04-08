@@ -319,42 +319,42 @@ void QUADSPI_IRQHandler(void)
 //void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
 //}
 
-void HAL_QSPI_RxCpltCallback(QSPI_HandleTypeDef *hqspi) {
-	if (get_mean) {
-		for(j=0;j<AUDIO_SAMPLE_SIZE;j++) {
-			if (j%2) {
-				mu2 += flashBuffer[j];
-			}
-			else {
-				mu1 += flashBuffer[j];
-			}
-		}
-		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
-		get_mean = 0;
-	}
-	
-	if (read_flash) {
-		for (j=0;j<AUDIO_SAMPLE_SIZE;j++) {
-			matrixBuffer[j] = flashBuffer[j];
-		}
-		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
-		read_flash = 0;
-	}
-	if (read_flash_find_min_max) {
-		for (j=0;j<AUDIO_SAMPLE_SIZE;j++) {
-			matrixBuffer[j] = flashBuffer[j];
-			if (j%2) {
-				if(matrixBuffer[j] > maxVal1) maxVal1 = matrixBuffer[j];
-				if(matrixBuffer[j] < minVal1) minVal1 = matrixBuffer[j];
-			}
-			else {
-				if(matrixBuffer[j] > maxVal2) maxVal2 = matrixBuffer[j];
-				if(matrixBuffer[j] < minVal2) minVal2 = matrixBuffer[j];
-			}
-		}
-		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
-	}
-}
+//void HAL_QSPI_RxCpltCallback(QSPI_HandleTypeDef *hqspi) {
+//	if (get_mean) {
+//		for(j=0;j<AUDIO_SAMPLE_SIZE;j++) {
+//			if (j%2) {
+//				mu2 += flashBuffer[j];
+//			}
+//			else {
+//				mu1 += flashBuffer[j];
+//			}
+//		}
+//		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
+//		get_mean = 0;
+//	}
+//	
+//	if (read_flash) {
+//		for (j=0;j<AUDIO_SAMPLE_SIZE;j++) {
+//			matrixBuffer[j] = flashBuffer[j];
+//		}
+//		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
+//		read_flash = 0;
+//	}
+//	if (read_flash_find_min_max) {
+//		for (j=0;j<AUDIO_SAMPLE_SIZE;j++) {
+//			matrixBuffer[j] = flashBuffer[j];
+//			if (j%2) {
+//				if(matrixBuffer[j] > maxVal1) maxVal1 = matrixBuffer[j];
+//				if(matrixBuffer[j] < minVal1) minVal1 = matrixBuffer[j];
+//			}
+//			else {
+//				if(matrixBuffer[j] > maxVal2) maxVal2 = matrixBuffer[j];
+//				if(matrixBuffer[j] < minVal2) minVal2 = matrixBuffer[j];
+//			}
+//		}
+//		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
+//	}
+//}
 
 
 /* USER CODE END 1 */
