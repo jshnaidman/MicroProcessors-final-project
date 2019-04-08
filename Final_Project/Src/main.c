@@ -270,9 +270,9 @@ int main(void)
 	
 	// matrix coefficients
 	int a11 = 1;
-	int a12 = 0;
-	int a21 = 1;
-	int a22 = 0;
+	int a12 = 2;
+	int a21 = 3;
+	int a22 = 4;
 	float32_t angle1,angle2;
 	float32_t sinOne,sinTwo;
 	
@@ -390,7 +390,7 @@ int main(void)
 	arm_sqrt_f32(eigValueMatrixBuffer[3],&whiteningMatrixBuffer[3]);
 	whiteningMatrixBuffer[2] = 0;
 	arm_mat_inverse_f32(&whiteningMatrix,&tempMatrix); // store inverse of root eigenvalue matrix in temp
-	arm_mat_trans_f32(&eigVectorMatrix,&temp2Matrix); // store inverse of eigenvector matrix in temp2
+	arm_mat_trans_f32(&eigVectorMatrix,&temp2Matrix); // store transpose of eigenvector matrix in temp2
 	arm_mat_mult_f32(&tempMatrix, &temp2Matrix, &whiteningMatrix);
 	
 	float norm;
@@ -427,15 +427,16 @@ int main(void)
 		weightMatrixBuffer[0] = 0;
 		weightMatrixBuffer[1] = 0;
 		
+		flashAddr=0;
 		// update the weight chunk by chunk
 		while (flashAddr < AUDIO_STORAGE_SIZE) {
 			BSP_QSPI_Read( (uint8_t *) matrixBuffer, flashAddr, AUDIO_SAMPLE_SIZE_FLOAT);
 			flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
 			// white_mat = center_mat' * whitening_mat
 			// in the case that DMA finishes before calculations are all done, never use "matrix" after we have matrix2, which is the centralized matrix
-			arm_mat_sub_f32(&matrix,&meanMatrix,&matrix2); // centralize matrix, matrix2=center_mat (need to store in temp because we can't write where we read from)
-			arm_mat_mult_f32(&matrix2,&whiteningMatrix,&whiteMatrix); // white matrix is transpose of jerry's whiteMatrix cuz of how we store it
-																														// whitening_mat * center_mat = (center_mat' * whitening_mat)' since whitening_mat is symmetric
+			arm_mat_sub_f32(&matrix,&meanMatrix,&matrix2); // centralize matrix, matrix2=center_mat' (need to store in temp because we can't write where we read from)
+			arm_mat_trans_f32(&matrix2,&matrix);
+			arm_mat_mult_f32(&whiteningMatrix,&matrix,&whiteMatrix); 
 			
 			arm_mat_mult_f32(&whiteMatrix,&weightMatrix,&singleColMatrix); // white_mat * weight ~ ROW_SIZEx1
 			
