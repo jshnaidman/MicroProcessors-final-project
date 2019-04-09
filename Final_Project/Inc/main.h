@@ -55,7 +55,7 @@ extern "C" {
 #define AUDIO_SAMPLE_SIZE_SHORT 2*AUDIO_SAMPLE_SIZE // one sample is 2 bytes when converted to 12 bit resolution integer for DAC
 #define AUDIO_SAMPLE_SIZE_FLOAT 4*AUDIO_SAMPLE_SIZE // each sample is 4 bytes when stored as a float
 #define AUDIO_TWO_SECONDS 32000
-#define ONE_OVER_AUDIO_TWO_SECONDS_FLOAT 0.00003333444
+#define ONE_OVER_AUDIO_TWO_SECONDS_FLOAT 0.00003125097
 #define AUDIO_FOUR_SECONDS 2*AUDIO_TWO_SECONDS
 #define AUDIO_TWO_SECONDS_8BIT 64000 // number of bytes to represent 32000 samples of a 16 bit number
 #define AUDIO_TWO_SECONDS_FLOAT 128000 // number of bytes to represent 32000 samples of a float

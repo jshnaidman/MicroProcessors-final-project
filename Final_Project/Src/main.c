@@ -267,7 +267,7 @@ int main(void)
 	HAL_TIM_Base_Start(&htim6);
 	
 	BSP_QSPI_Init();
-	int reload=0;	//set reload to 0 to save time if flash memory is already filled
+	int reload=1;	//set reload to 0 to save time if flash memory is already filled
 
 	if(reload)BSP_QSPI_Erase_Chip(); // this can take like 30 seconds. 
 	
@@ -287,8 +287,8 @@ int main(void)
 		angle2 = TWO_PI_DIVIDED_BY_16000*((700*i)%16000);
 		sinOne = arm_sin_f32(angle1); // EVEN FLASH ADDR IS THE FIRST SIGNAL
 		sinTwo = arm_sin_f32(angle2); // ODD FLASH ADDR IS THE SECOND SIGNAL
-		matrixBuffer[i%AUDIO_SAMPLE_SIZE] = (a11*sinOne + a12*sinTwo)/(a11+a12); // combine and normalize between 0 and 1
-		matrixBuffer[(i+1)%AUDIO_SAMPLE_SIZE] = (a21*sinOne + a22*sinTwo)/(a21+a22);
+		matrixBuffer[i%AUDIO_SAMPLE_SIZE] = (a11*sinOne + a12*sinTwo); // combine and normalize between 0 and 1
+		matrixBuffer[(i+1)%AUDIO_SAMPLE_SIZE] = (a21*sinOne + a22*sinTwo);
 		if (!((i+2)%AUDIO_SAMPLE_SIZE)) {
 			BSP_QSPI_Write((uint8_t*) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // write 4000 bytes at a time
 			flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
@@ -361,7 +361,7 @@ int main(void)
 	flashAddr = 0; // reset the read addr from flash
 	
 	while (flashAddr < AUDIO_STORAGE_SIZE) {
-		BSP_QSPI_Read((uint8_t *) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // start next DMA read
+		BSP_QSPI_Read((uint8_t *) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); //read 2000 samples
 		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
 		for(i=0;i<AUDIO_SAMPLE_SIZE;i++) {
 			if (i%2) {
@@ -376,6 +376,7 @@ int main(void)
 		// calculate the covariance matrix for this chunk
 		arm_mat_sub_f32(&matrix,&meanMatrix,&tempCby2Matrix); // centralize matrix (need to store in temp because we can't write where we read from)
 		arm_mat_trans_f32(&tempCby2Matrix, &transposeMatrix); // fills transpose matrix with transpose (2xROW_SIZE)
+		// eigValueMatrix and eigVectorMatrix are both used as temporary buffers for now, until eigenvectors are calculated
 		arm_mat_mult_f32(&transposeMatrix, &tempCby2Matrix,&eigValueMatrix); // multiply transpose matrix with centralized input matrix -> 2xROW_SIZE x ROW_SIZEx2 ~ 2x2
 		arm_mat_add_f32(&eigValueMatrix, &covarianceMatrix,&eigVectorMatrix); // add partial sum to total 
 		for(i=0;i<4;i++) { covarianceMatrixBuffer[i] = eigVectorMatrixBuffer[i]; } // store total in covarianceMatrix (this may be unnecessary or can be optimized to use different buffer every time to eliminate copying)
