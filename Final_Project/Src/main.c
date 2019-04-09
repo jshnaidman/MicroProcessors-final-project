@@ -54,6 +54,12 @@ arm_matrix_instance_f32 matrix2;
 float transposeMatrixBuffer[AUDIO_SAMPLE_SIZE];
 arm_matrix_instance_f32 transposeMatrix;
 
+float tempCby2MatrixBuffer[AUDIO_SAMPLE_SIZE];
+arm_matrix_instance_f32 tempCby2Matrix;
+
+float tempCby2TwoMatrixBuffer[AUDIO_SAMPLE_SIZE];
+arm_matrix_instance_f32 tempCby2TwoMatrix;
+
 float meanMatrixBuffer[AUDIO_SAMPLE_SIZE];
 arm_matrix_instance_f32 meanMatrix;
 
@@ -87,6 +93,9 @@ arm_matrix_instance_f32 eigVectorMatrix;
 float whiteningMatrixBuffer[4];
 arm_matrix_instance_f32 whiteningMatrix;
 
+float temp2by2TwoMatrixBuffer[4];
+arm_matrix_instance_f32 temp2by2TwoMatrix;
+
 float weightMatrixBuffer[2];
 arm_matrix_instance_f32 weightMatrix;
 
@@ -101,12 +110,6 @@ arm_matrix_instance_f32 secondTemp2by1Matrix;
 
 float thirdTemp2by1MatrixBuffer[2];
 arm_matrix_instance_f32 thirdTemp2by1Matrix;
-
-float tempMatrixBuffer[ROW_SIZE];
-arm_matrix_instance_f32 tempMatrix;
-
-float temp2MatrixBuffer[ROW_SIZE];
-arm_matrix_instance_f32 temp2Matrix;
 
 float covarianceMatrixBuffer[4];
 arm_matrix_instance_f32 covarianceMatrix;
@@ -337,8 +340,6 @@ int main(void)
 	arm_mat_init_f32(&transposeMatrix, 2, ROW_SIZE, transposeMatrixBuffer); // 2 x ROW_SIZE
 	arm_mat_init_f32(&meanMatrix, ROW_SIZE, 2, meanMatrixBuffer); // to be subtracted from "matrix" to centralize it.
 	arm_mat_init_f32(&covarianceMatrix, 2, 2, covarianceMatrixBuffer);
-	arm_mat_init_f32(&tempMatrix, ROW_SIZE, 2, tempMatrixBuffer);
-	arm_mat_init_f32(&temp2Matrix, ROW_SIZE, 2, temp2MatrixBuffer);
 	arm_mat_init_f32(&eigValueMatrix, 2, 2, eigValueMatrixBuffer);
 	arm_mat_init_f32(&eigVectorMatrix, 2, 2, eigVectorMatrixBuffer);
 	arm_mat_init_f32(&whiteningMatrix, 2, 2, whiteningMatrixBuffer);
@@ -352,6 +353,9 @@ int main(void)
 	arm_mat_init_f32(&singleCol2Matrix,AUDIO_SAMPLE_SIZE,1,singleCol2MatrixBuffer); // AUDIO_SAMPLE_SIZE x 1
 	arm_mat_init_f32(&singleCol3Matrix,AUDIO_SAMPLE_SIZE,1,singleCol3MatrixBuffer); // AUDIO_SAMPLE_SIZE x 1
 	arm_mat_init_f32(&temp2by2Matrix,2,2,temp2by2MatrixBuffer); // 2x2
+	arm_mat_init_f32(&temp2by2TwoMatrix,2,2,temp2by2TwoMatrixBuffer); // 2x2
+	arm_mat_init_f32(&tempCby2Matrix,ROW_SIZE,2,tempCby2MatrixBuffer); // 2x2
+	arm_mat_init_f32(&tempCby2TwoMatrix,ROW_SIZE,2,tempCby2TwoMatrixBuffer); // 2x2
 	arm_mat_init_f32(&icaFilterMatrix,2,2,icaFilterMatrixBuffer); // 2x2
 	
 	flashAddr = 0; // reset the read addr from flash
@@ -370,9 +374,9 @@ int main(void)
 			}
 		}
 		// calculate the covariance matrix for this chunk
-		arm_mat_sub_f32(&matrix,&meanMatrix,&tempMatrix); // centralize matrix (need to store in temp because we can't write where we read from)
-		arm_mat_trans_f32(&tempMatrix, &transposeMatrix); // fills transpose matrix with transpose (2xROW_SIZE)
-		arm_mat_mult_f32(&transposeMatrix, &tempMatrix,&eigValueMatrix); // multiply transpose matrix with centralized input matrix -> 2xROW_SIZE x ROW_SIZEx2 ~ 2x2
+		arm_mat_sub_f32(&matrix,&meanMatrix,&tempCby2Matrix); // centralize matrix (need to store in temp because we can't write where we read from)
+		arm_mat_trans_f32(&tempCby2Matrix, &transposeMatrix); // fills transpose matrix with transpose (2xROW_SIZE)
+		arm_mat_mult_f32(&transposeMatrix, &tempCby2Matrix,&eigValueMatrix); // multiply transpose matrix with centralized input matrix -> 2xROW_SIZE x ROW_SIZEx2 ~ 2x2
 		arm_mat_add_f32(&eigValueMatrix, &covarianceMatrix,&eigVectorMatrix); // add partial sum to total 
 		for(i=0;i<4;i++) { covarianceMatrixBuffer[i] = eigVectorMatrixBuffer[i]; } // store total in covarianceMatrix (this may be unnecessary or can be optimized to use different buffer every time to eliminate copying)
 	}
@@ -388,9 +392,9 @@ int main(void)
 	whiteningMatrixBuffer[1] = 0;
 	arm_sqrt_f32(eigValueMatrixBuffer[3],&whiteningMatrixBuffer[3]);
 	whiteningMatrixBuffer[2] = 0;
-	arm_mat_inverse_f32(&whiteningMatrix,&tempMatrix); // store inverse of root eigenvalue matrix in temp
-	arm_mat_trans_f32(&eigVectorMatrix,&temp2Matrix); // store transpose of eigenvector matrix in temp2
-	arm_mat_mult_f32(&tempMatrix, &temp2Matrix, &whiteningMatrix);
+	arm_mat_inverse_f32(&whiteningMatrix,&temp2by2Matrix); // store inverse of root eigenvalue matrix in temp
+	arm_mat_trans_f32(&eigVectorMatrix,&temp2by2TwoMatrix); // store transpose of eigenvector matrix in temp2
+	arm_mat_mult_f32(&temp2by2Matrix, &temp2by2TwoMatrix, &whiteningMatrix);
 	
 	float norm;
 	
@@ -474,7 +478,7 @@ int main(void)
 	maxVal2 -= minVal2;
 	
 	// change dimensions of temp2 matrix for DAC output
-	arm_mat_init_f32(&temp2Matrix, 2, ROW_SIZE, temp2MatrixBuffer);
+	arm_mat_init_f32(&singleColMatrix, 2, ROW_SIZE, singleColMatrixBuffer);
 
   /* USER CODE END 2 */
 

@@ -58,8 +58,8 @@ extern arm_matrix_instance_f32 matrix;
 extern arm_matrix_instance_f32 transposeMatrix;
 extern arm_matrix_instance_f32 icaFilterMatrix;
 extern arm_matrix_instance_f32 matrix2;
-extern arm_matrix_instance_f32 temp2Matrix;
-extern float temp2MatrixBuffer[];
+extern arm_matrix_instance_f32 singleColMatrix;
+extern float singleColMatrixBuffer[];
 /* USER CODE END TD */
 
 /* Private define ------------------------------------------------------------*/
@@ -329,17 +329,17 @@ void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
 		BSP_QSPI_Read( (uint8_t *) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // read next 2000 samples
 		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
 		arm_mat_trans_f32(&matrix, &transposeMatrix); // fills transposeMatrix with transpose of matrix. Need to do this because stored as transpose in memory
-		arm_mat_mult_f32(&icaFilterMatrix,&transposeMatrix,&temp2Matrix); // store result of filtering in matrix2 which is 2xROW_SIZE
+		arm_mat_mult_f32(&icaFilterMatrix,&transposeMatrix,&singleColMatrix); // store result of filtering in matrix2 which is 2xROW_SIZE
 		// store signal as 0-4095 in DAC buffer
 		for (i=0;i<ROW_SIZE;i++) {
-			temp2MatrixBuffer[i] -= minVal1;
-			temp2MatrixBuffer[i] *= (4095/maxVal1);
-			audioBufferLeft[i] = temp2MatrixBuffer[i];
+			singleColMatrixBuffer[i] -= minVal1;
+			singleColMatrixBuffer[i] *= (4095/maxVal1);
+			singleColMatrixBuffer[i] = singleColMatrixBuffer[i];
 		}
 		for (i=ROW_SIZE;i<AUDIO_SAMPLE_SIZE;i++) {
-			temp2MatrixBuffer[i] -= minVal2;
-			temp2MatrixBuffer[i] *= (4095/maxVal2);
-			audioBufferRight[i] = temp2MatrixBuffer[i];
+			singleColMatrixBuffer[i] -= minVal2;
+			singleColMatrixBuffer[i] *= (4095/maxVal2);
+			audioBufferRight[i] = singleColMatrixBuffer[i];
 		}
 }
 

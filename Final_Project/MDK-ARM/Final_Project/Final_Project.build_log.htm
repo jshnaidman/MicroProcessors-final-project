@@ -31,10 +31,18 @@ compiling stm32l4xx_it.c...
 ../Src/stm32l4xx_it.c(126): warning:  #177-D: variable "y"  was declared but never referenced
   	int y = x+1;
 ../Src/stm32l4xx_it.c: 1 warning, 0 errors
+compiling main.c...
+../Src/main.c(416): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  		if(norm < EPSILON) {
+../Src/main.c(421): warning:  #1035-D: single-precision operand implicitly converted to double-precision
+  		if(norm < EPSILON) {
+../Src/main.c(238): warning:  #177-D: variable "sCommand"  was declared but never referenced
+  	QSPI_CommandTypeDef sCommand;
+../Src/main.c: 3 warnings, 0 errors
 linking...
-Program Size: Code=20900 RO-data=2548 RW-data=292 ZI-data=89492  
+Program Size: Code=21000 RO-data=2548 RW-data=300 ZI-data=97508  
 FromELF: creating hex file...
-"Final_Project\Final_Project.axf" - 0 Error(s), 1 Warning(s).
+"Final_Project\Final_Project.axf" - 0 Error(s), 4 Warning(s).
 
 <h2>Software Packages used:</h2>
 
@@ -63,7 +71,7 @@ Package Vendor: Keil
    * Component: ARM::CMSIS:DSP:1.5.2
       Include file:  CMSIS\DSP\Include\arm_math.h
       Library file:  CMSIS\Lib\ARM\arm_cortexM4lf_math.lib
-Build Time Elapsed:  00:00:03
+Build Time Elapsed:  00:00:04
 </pre>
 </body>
 </html>
