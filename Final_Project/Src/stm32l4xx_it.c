@@ -58,7 +58,8 @@ extern arm_matrix_instance_f32 matrix;
 extern arm_matrix_instance_f32 transposeMatrix;
 extern arm_matrix_instance_f32 icaFilterMatrix;
 extern arm_matrix_instance_f32 matrix2;
-
+extern arm_matrix_instance_f32 temp2Matrix;
+extern float temp2MatrixBuffer[];
 /* USER CODE END TD */
 
 /* Private define ------------------------------------------------------------*/
@@ -331,14 +332,14 @@ void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
 		arm_mat_mult_f32(&icaFilterMatrix,&transposeMatrix,&temp2Matrix); // store result of filtering in matrix2 which is 2xROW_SIZE
 		// store signal as 0-4095 in DAC buffer
 		for (i=0;i<ROW_SIZE;i++) {
-			temp2Matrix[i] -= minVal1;
-			temp2Matrix[i] *= (4095/maxVal1);
-			audioBufferLeft[i] = temp2Matrix[i];
+			temp2MatrixBuffer[i] -= minVal1;
+			temp2MatrixBuffer[i] *= (4095/maxVal1);
+			audioBufferLeft[i] = temp2MatrixBuffer[i];
 		}
 		for (i=ROW_SIZE;i<AUDIO_SAMPLE_SIZE;i++) {
-			temp2Matrix[i] -= minVal2;
-			temp2Matrix[i] *= (4095/maxVal2);
-			audioBufferRight[i] = temp2Matrix[i];
+			temp2MatrixBuffer[i] -= minVal2;
+			temp2MatrixBuffer[i] *= (4095/maxVal2);
+			audioBufferRight[i] = temp2MatrixBuffer[i];
 		}
 }
 

@@ -444,7 +444,7 @@ int main(void)
 			arm_mat_mult_f32(&transposeMatrix,&singleCol3Matrix, &temp2by1Matrix); // 2xC * Cx1 ~ 2x1
 			
 			arm_scale_f32(temp2by1MatrixBuffer,ONE_OVER_TOTAL_SAMPLE_SIZE,secondTemp2by1MatrixBuffer,2); // divide by num_samples
-			arm_scale_f32(weightMatrixBuffer,(1/3.0),temp2by1MatrixBuffer,2); // 3*weight
+			arm_scale_f32(weightMatrixBuffer,3,temp2by1MatrixBuffer,2); // 3*weight
 			arm_sub_f32(secondTemp2by1MatrixBuffer,temp2by1MatrixBuffer,thirdTemp2by1MatrixBuffer,2); // finish weight update for this chunk
 			arm_add_f32(thirdTemp2by1MatrixBuffer,weightMatrixBuffer, secondTemp2by1MatrixBuffer, 2); // add chunk to total (can't write to weightMatrixBuffer directly since we are reading from there)
 			for(int j=0;j<4;j++) { weightMatrixBuffer[i] = secondTemp2by1MatrixBuffer[i]; } // store total in weightMatrixBuffer 
