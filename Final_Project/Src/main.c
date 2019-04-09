@@ -371,8 +371,8 @@ int main(void)
 		}
 		// calculate the covariance matrix for this chunk
 		arm_mat_sub_f32(&matrix,&meanMatrix,&tempMatrix); // centralize matrix (need to store in temp because we can't write where we read from)
-		arm_mat_trans_f32(&tempMatrix, &transposeMatrix); // fills transpose matrix with transpose (2x32000)
-		arm_mat_mult_f32(&transposeMatrix, &tempMatrix,&eigValueMatrix); // multiply transpose matrix with centralized input matrix -> 2x32000 x 32000x2 ~ 2x2
+		arm_mat_trans_f32(&tempMatrix, &transposeMatrix); // fills transpose matrix with transpose (2xROW_SIZE)
+		arm_mat_mult_f32(&transposeMatrix, &tempMatrix,&eigValueMatrix); // multiply transpose matrix with centralized input matrix -> 2xROW_SIZE x ROW_SIZEx2 ~ 2x2
 		arm_mat_add_f32(&eigValueMatrix, &covarianceMatrix,&eigVectorMatrix); // add partial sum to total 
 		for(i=0;i<4;i++) { covarianceMatrixBuffer[i] = eigVectorMatrixBuffer[i]; } // store total in covarianceMatrix (this may be unnecessary or can be optimized to use different buffer every time to eliminate copying)
 	}
@@ -432,7 +432,7 @@ int main(void)
 			arm_mat_sub_f32(&matrix,&meanMatrix,&matrix2); // centralize matrix, matrix2=center_mat' (need to store in temp because we can't write where we read from)
 			arm_mat_trans_f32(&matrix2,&transposeMatrix);
 			arm_mat_mult_f32(&whiteningMatrix,&transposeMatrix,&whiteMatrix); // 2 x C
-			arm_mat_trans_f32(&whiteMatrix,&transposeMatrix); // N x C
+			arm_mat_trans_f32(&whiteMatrix,&transposeMatrix); // 2 x C
 			arm_mat_mult_f32(&transposeMatrix,&weightMatrix,&singleColMatrix); // white_mat * weight ~ Nx1
 			
 			// take result to the third power
@@ -440,7 +440,8 @@ int main(void)
 			arm_mult_f32(singleColMatrixBuffer,singleCol2MatrixBuffer,singleCol3MatrixBuffer, AUDIO_SAMPLE_SIZE);
 			
 			// transpose is first argument because we store it in memory as "transpose" already
-			arm_mat_mult_f32(&whiteMatrix,&singleCol3Matrix, &temp2by1Matrix); // 2xROW_SIZE * ROW_SIZEx1 ~ 2x1
+			arm_mat_trans_f32(&whiteMatrix,&transposeMatrix); // 2 x C
+			arm_mat_mult_f32(&transposeMatrix,&singleCol3Matrix, &temp2by1Matrix); // 2xC * Cx1 ~ 2x1
 			
 			arm_scale_f32(temp2by1MatrixBuffer,ONE_OVER_TOTAL_SAMPLE_SIZE,secondTemp2by1MatrixBuffer,2); // divide by num_samples
 			arm_scale_f32(weightMatrixBuffer,3,temp2by1MatrixBuffer,2); // 3*weight
