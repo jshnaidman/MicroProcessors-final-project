@@ -102,10 +102,10 @@ arm_matrix_instance_f32 secondTemp2by1Matrix;
 float thirdTemp2by1MatrixBuffer[2];
 arm_matrix_instance_f32 thirdTemp2by1Matrix;
 
-float tempMatrixBuffer[4];
+float tempMatrixBuffer[ROW_SIZE];
 arm_matrix_instance_f32 tempMatrix;
 
-float temp2MatrixBuffer[4];
+float temp2MatrixBuffer[ROW_SIZE];
 arm_matrix_instance_f32 temp2Matrix;
 
 float covarianceMatrixBuffer[4];
@@ -373,9 +373,9 @@ int main(void)
 		// calculate the covariance matrix for this chunk
 		arm_mat_sub_f32(&matrix,&meanMatrix,&tempMatrix); // centralize matrix (need to store in temp because we can't write where we read from)
 		arm_mat_trans_f32(&tempMatrix, &transposeMatrix); // fills transpose matrix with transpose (2x32000)
-		arm_mat_mult_f32(&transposeMatrix, &tempMatrix,&matrix); // multiply transpose matrix with centralized input matrix -> 2x32000 x 32000x2 ~ 2x2
-		arm_mat_add_f32(&matrix, &covarianceMatrix,&tempMatrix); // add partial sum to total 
-		for(i=0;i<4;i++) { covarianceMatrixBuffer[i] = tempMatrixBuffer[i]; } // store total in covarianceMatrix (this may be unnecessary or can be optimized to use different buffer every time to eliminate copying)
+		arm_mat_mult_f32(&transposeMatrix, &tempMatrix,&eigValueMatrix); // multiply transpose matrix with centralized input matrix -> 2x32000 x 32000x2 ~ 2x2
+		arm_mat_add_f32(&eigValueMatrix, &covarianceMatrix,&eigVectorMatrix); // add partial sum to total 
+		for(i=0;i<4;i++) { covarianceMatrixBuffer[i] = eigVectorMatrixBuffer[i]; } // store total in covarianceMatrix (this may be unnecessary or can be optimized to use different buffer every time to eliminate copying)
 	}
 	
 	arm_mat_scale_f32(&covarianceMatrix,AUDIO_TWO_SECONDS,&covarianceMatrix); // divide by N to get covariance
@@ -395,8 +395,8 @@ int main(void)
 	
 	float norm;
 	
-	temp2by1MatrixBuffer[0] = rand()%100; // use modulo 100 so that the integer isn't too large which can make computation lengthy
-	temp2by1MatrixBuffer[1] = rand()%100; // use modulo 100 so that the integer isn't too large which can make computation lengthy
+	temp2by1MatrixBuffer[0] = (rand()%100)/100.0; // use modulo 100 so that the integer isn't too large which can make computation lengthy
+	temp2by1MatrixBuffer[1] = (rand()%100)/100.0; // use modulo 100 so that the integer isn't too large which can make computation lengthy
 	
 	getNorm(temp2by1MatrixBuffer,2,&norm);
 	arm_mat_scale_f32(&temp2by1Matrix,(1/norm),&weightMatrix); // normalize the weight matrix
@@ -422,10 +422,6 @@ int main(void)
 		// store the weight into oldWeight
 		weightOldMatrixBuffer[0] = weightMatrixBuffer[0]; // store old weight
 		weightOldMatrixBuffer[1] = weightMatrixBuffer[1];
-		
-		// set weight to 0
-		weightMatrixBuffer[0] = 0;
-		weightMatrixBuffer[1] = 0;
 		
 		flashAddr=0;
 		// update the weight chunk by chunk
