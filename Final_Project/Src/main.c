@@ -197,10 +197,10 @@ void calculateEigen() {
 	float eig2 = (tr - root )/2;
 	
 	// create eigenValue matrix
-	eigValueMatrixBuffer[0] = eig1;
+	eigValueMatrixBuffer[0] = eig2;
   eigValueMatrixBuffer[1] = 0;
   eigValueMatrixBuffer[2] = 0;
-	eigValueMatrixBuffer[3] = eig2;
+	eigValueMatrixBuffer[3] = eig1;
 
 	
 	// create eigenVector matrix
@@ -430,7 +430,7 @@ int main(void)
 			// white_mat = center_mat' * whitening_mat
 			// in the case that DMA finishes before calculations are all done, never use "matrix" after we have matrix2, which is the centralized matrix
 			arm_mat_sub_f32(&matrix,&meanMatrix,&matrix2); // centralize matrix, matrix2=center_mat' (need to store in temp because we can't write where we read from)
-			arm_mat_trans_f32(&matrix2,&transposeMatrix);
+			arm_mat_trans_f32(&matrix2,&transposeMatrix); // need to take transpose so that it's the same dimensions as jerry's
 			arm_mat_mult_f32(&whiteningMatrix,&transposeMatrix,&whiteMatrix); // 2 x C
 			arm_mat_trans_f32(&whiteMatrix,&transposeMatrix); // 2 x C
 			arm_mat_mult_f32(&transposeMatrix,&weightMatrix,&singleColMatrix); // white_mat * weight ~ Nx1
@@ -444,9 +444,9 @@ int main(void)
 			arm_mat_mult_f32(&transposeMatrix,&singleCol3Matrix, &temp2by1Matrix); // 2xC * Cx1 ~ 2x1
 			
 			arm_scale_f32(temp2by1MatrixBuffer,ONE_OVER_TOTAL_SAMPLE_SIZE,secondTemp2by1MatrixBuffer,2); // divide by num_samples
-			arm_scale_f32(weightMatrixBuffer,3,temp2by1MatrixBuffer,2); // 3*weight
+			arm_scale_f32(weightMatrixBuffer,(1/3.0),temp2by1MatrixBuffer,2); // 3*weight
 			arm_sub_f32(secondTemp2by1MatrixBuffer,temp2by1MatrixBuffer,thirdTemp2by1MatrixBuffer,2); // finish weight update for this chunk
-			arm_add_f32(thirdTemp2by1MatrixBuffer,weightMatrixBuffer, secondTemp2by1MatrixBuffer, 2); // add chunnk to total (can't write to weightMatrixBuffer directly since we are reading from there)
+			arm_add_f32(thirdTemp2by1MatrixBuffer,weightMatrixBuffer, secondTemp2by1MatrixBuffer, 2); // add chunk to total (can't write to weightMatrixBuffer directly since we are reading from there)
 			for(int j=0;j<4;j++) { weightMatrixBuffer[i] = secondTemp2by1MatrixBuffer[i]; } // store total in weightMatrixBuffer 
 		}
 		// normalize the weight
@@ -472,6 +472,9 @@ int main(void)
 	// max value recorded needs to be adjusted by offset that will be applied later to normalize it
 	maxVal1 -= minVal1;
 	maxVal2 -= minVal2;
+	
+	// change dimensions of temp2 matrix for DAC output
+	arm_mat_init_f32(&temp2Matrix, 2, ROW_SIZE, temp2MatrixBuffer);
 
   /* USER CODE END 2 */
 
