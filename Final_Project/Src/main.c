@@ -210,13 +210,13 @@ void calculateEigen() {
 	eigVectorMatrixBuffer[3] = d - eig2;
 	
 	
-	// normalize first row
+	// normalize first column
 	float norm;
 	float temp = eigVectorMatrixBuffer[0]*eigVectorMatrixBuffer[0] + eigVectorMatrixBuffer[2]*eigVectorMatrixBuffer[2];
 	arm_sqrt_f32(temp, &norm);
 	eigVectorMatrixBuffer[0] /= norm;
 	eigVectorMatrixBuffer[2] /= norm;
-	// normalize second row
+	// normalize second column
 	temp = eigVectorMatrixBuffer[1]*eigVectorMatrixBuffer[1] + eigVectorMatrixBuffer[3]*eigVectorMatrixBuffer[3];
 	arm_sqrt_f32(temp, &norm);
 	eigVectorMatrixBuffer[1] /= norm;
@@ -303,15 +303,14 @@ int main(void)
 	// get the mean
 	// since we are using DMA, there's no point using CMSIS since we're bottlenecked by the speed of reading from flash
 	while (flashAddr < AUDIO_STORAGE_SIZE) {
-		get_mean = 1; // set flag so that rxCallback knows which code to execute
 		BSP_QSPI_Read((uint8_t *) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT);
 		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
 		for(int j=0;j<AUDIO_SAMPLE_SIZE;j++) {
 			if (j%2) {
-				mu2 += matrixBuffer[j];
+				mu1 += matrixBuffer[j];
 			}
 			else {
-				mu1 += matrixBuffer[j];
+				mu2 += matrixBuffer[j];
 			}
 		}
 	}
@@ -322,10 +321,10 @@ int main(void)
 	// mean matrix is 32000 by 2, even indices are first column, odd indices are second column.
 	for(i=0;i<AUDIO_SAMPLE_SIZE;i++){ 
 		if (i%2) {
-			meanMatrixBuffer[i] = mu2; // init the meanMatrixBuffer with the means calculated
+			meanMatrixBuffer[i] = mu1; // init the meanMatrixBuffer with the means calculated
 		}
 		else {
-			meanMatrixBuffer[i] = mu1;
+			meanMatrixBuffer[i] = mu2;
 		}
 	}
 	
@@ -348,7 +347,7 @@ int main(void)
 	arm_mat_init_f32(&temp2by1Matrix,2,1,temp2by1MatrixBuffer);
 	arm_mat_init_f32(&secondTemp2by1Matrix,2,1,secondTemp2by1MatrixBuffer);
 	arm_mat_init_f32(&thirdTemp2by1Matrix,2,1,thirdTemp2by1MatrixBuffer);
-	arm_mat_init_f32(&whiteMatrix,ROW_SIZE,2,whiteMatrixBuffer);
+	arm_mat_init_f32(&whiteMatrix,2,ROW_SIZE,whiteMatrixBuffer);
 	arm_mat_init_f32(&singleColMatrix,AUDIO_SAMPLE_SIZE,1,singleColMatrixBuffer); // AUDIO_SAMPLE_SIZE x 1
 	arm_mat_init_f32(&singleCol2Matrix,AUDIO_SAMPLE_SIZE,1,singleCol2MatrixBuffer); // AUDIO_SAMPLE_SIZE x 1
 	arm_mat_init_f32(&singleCol3Matrix,AUDIO_SAMPLE_SIZE,1,singleCol3MatrixBuffer); // AUDIO_SAMPLE_SIZE x 1
@@ -378,7 +377,7 @@ int main(void)
 		for(i=0;i<4;i++) { covarianceMatrixBuffer[i] = eigVectorMatrixBuffer[i]; } // store total in covarianceMatrix (this may be unnecessary or can be optimized to use different buffer every time to eliminate copying)
 	}
 	
-	arm_mat_scale_f32(&covarianceMatrix,AUDIO_TWO_SECONDS,&covarianceMatrix); // divide by N to get covariance
+	arm_mat_scale_f32(&covarianceMatrix,ONE_OVER_AUDIO_TWO_SECONDS_FLOAT,&covarianceMatrix); // divide by N to get covariance
 	
 	calculateEigen();
 	
@@ -431,19 +430,17 @@ int main(void)
 			// white_mat = center_mat' * whitening_mat
 			// in the case that DMA finishes before calculations are all done, never use "matrix" after we have matrix2, which is the centralized matrix
 			arm_mat_sub_f32(&matrix,&meanMatrix,&matrix2); // centralize matrix, matrix2=center_mat' (need to store in temp because we can't write where we read from)
-			arm_mat_trans_f32(&matrix2,&matrix);
-			arm_mat_mult_f32(&whiteningMatrix,&matrix,&whiteMatrix); 
-			
-			arm_mat_mult_f32(&whiteMatrix,&weightMatrix,&singleColMatrix); // white_mat * weight ~ ROW_SIZEx1
+			arm_mat_trans_f32(&matrix2,&transposeMatrix);
+			arm_mat_mult_f32(&whiteningMatrix,&transposeMatrix,&whiteMatrix); // 2 x C
+			arm_mat_trans_f32(&whiteMatrix,&transposeMatrix); // N x C
+			arm_mat_mult_f32(&transposeMatrix,&weightMatrix,&singleColMatrix); // white_mat * weight ~ Nx1
 			
 			// take result to the third power
 			arm_mult_f32(singleColMatrixBuffer,singleColMatrixBuffer,singleCol2MatrixBuffer, AUDIO_SAMPLE_SIZE);
 			arm_mult_f32(singleColMatrixBuffer,singleCol2MatrixBuffer,singleCol3MatrixBuffer, AUDIO_SAMPLE_SIZE);
 			
-			arm_mat_trans_f32(&whiteMatrix, &transposeMatrix); // fills transposeMatrix with transpose of whiteMatrix
-			
 			// transpose is first argument because we store it in memory as "transpose" already
-			arm_mat_mult_f32(&transposeMatrix,&singleCol3Matrix, &temp2by1Matrix); // 2xROW_SIZE * ROW_SIZEx1 ~ 2x1
+			arm_mat_mult_f32(&whiteMatrix,&singleCol3Matrix, &temp2by1Matrix); // 2xROW_SIZE * ROW_SIZEx1 ~ 2x1
 			
 			arm_scale_f32(temp2by1MatrixBuffer,ONE_OVER_TOTAL_SAMPLE_SIZE,secondTemp2by1MatrixBuffer,2); // divide by num_samples
 			arm_scale_f32(weightMatrixBuffer,3,temp2by1MatrixBuffer,2); // 3*weight
@@ -485,21 +482,6 @@ int main(void)
 		
 		if (flashAddr >= AUDIO_STORAGE_SIZE) {
 			flashAddr = 0;
-		}
-		BSP_QSPI_Read( (uint8_t *) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // read next 2000 samples
-		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
-		arm_mat_trans_f32(&matrix, &transposeMatrix); // fills transposeMatrix with transpose of matrix. Need to do this because stored as transpose in memory
-		arm_mat_mult_f32(&icaFilterMatrix,&transposeMatrix,&matrix2); // store result of filtering in matrix2 which is 2xROW_SIZE
-		// store signal as 0-4095 in DAC buffer
-		for (i=0;i<ROW_SIZE;i++) {
-			matrix2Buffer[i] -= minVal1;
-			matrix2Buffer[i] *= (4095/maxVal1);
-			audioBufferLeft[i] = matrix2Buffer[i];
-		}
-		for (i=ROW_SIZE;i<AUDIO_SAMPLE_SIZE;i++) {
-			matrix2Buffer[i] -= minVal2;
-			matrix2Buffer[i] *= (4095/maxVal2);
-			audioBufferRight[i] = matrix2Buffer[i];
 		}
 		
 		
