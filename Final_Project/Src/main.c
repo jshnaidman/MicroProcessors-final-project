@@ -96,6 +96,9 @@ arm_matrix_instance_f32 temp2by2TwoMatrix;
 float weightMatrixBuffer[2];
 arm_matrix_instance_f32 weightMatrix;
 
+float weightSumMatrixBuffer[2];
+arm_matrix_instance_f32 weightSumMatrix;
+
 float weightOldMatrixBuffer[2];
 arm_matrix_instance_f32 weightOldMatrix;
 
@@ -408,7 +411,6 @@ int main(void)
 	
 	
 	for(i=0;i<1000;i++) {
-		
 		// test for convergence
 		arm_sub_f32(weightMatrixBuffer,weightOldMatrixBuffer,temp2by1MatrixBuffer,2);
 		getNorm(temp2by1MatrixBuffer,2,&norm);
@@ -421,6 +423,8 @@ int main(void)
 			break; 
 		}
 		
+		weightSumMatrixBuffer[0] = 0;
+		weightSumMatrixBuffer[1] = 0;
 		// store the weight into oldWeight
 		weightOldMatrixBuffer[0] = weightMatrixBuffer[0]; // store old weight
 		weightOldMatrixBuffer[1] = weightMatrixBuffer[1];
@@ -436,22 +440,21 @@ int main(void)
 			arm_mat_trans_f32(&matrix2,&transposeMatrix); // need to take transpose so that it's the same dimensions as jerry's
 			arm_mat_mult_f32(&whiteningMatrix,&transposeMatrix,&whiteMatrix); // 2 x C
 			arm_mat_trans_f32(&whiteMatrix,&tempCby2Matrix); // C x 2
-			arm_mat_mult_f32(&tempCby2Matrix,&weightMatrix,&singleColMatrix); // white_mat * weight ~ Nx1
+			arm_mat_mult_f32(&tempCby2Matrix,&weightMatrix,&singleColMatrix); // white_mat.T * weight ~ Nx1
 			
 			// take result to the third power
 			arm_mult_f32(singleColMatrixBuffer,singleColMatrixBuffer,singleCol2MatrixBuffer, AUDIO_SAMPLE_SIZE);
 			arm_mult_f32(singleColMatrixBuffer,singleCol2MatrixBuffer,singleCol3MatrixBuffer, AUDIO_SAMPLE_SIZE);
 			
-			// transpose is first argument because we store it in memory as "transpose" already
 			arm_mat_mult_f32(&whiteMatrix,&singleCol3Matrix, &temp2by1Matrix); // 2xC * Cx1 ~ 2x1
 			
 			arm_scale_f32(temp2by1MatrixBuffer,ONE_OVER_TOTAL_SAMPLE_SIZE,secondTemp2by1MatrixBuffer,2); // divide by num_samples
-			arm_scale_f32(weightMatrixBuffer,3,temp2by1MatrixBuffer,2); // 3*weight
-			arm_sub_f32(secondTemp2by1MatrixBuffer,temp2by1MatrixBuffer,thirdTemp2by1MatrixBuffer,2); // finish weight update for this chunk
-			arm_add_f32(thirdTemp2by1MatrixBuffer,weightMatrixBuffer, secondTemp2by1MatrixBuffer, 2); // add chunk to total (can't write to weightMatrixBuffer directly since we are reading from there)
-			for(int j=0;j<4;j++) { weightMatrixBuffer[i] = secondTemp2by1MatrixBuffer[i]; } // store total in weightMatrixBuffer 
+			arm_add_f32(secondTemp2by1MatrixBuffer,weightSumMatrixBuffer, thirdTemp2by1MatrixBuffer, 2); // add chunk to total (can't write to weightMatrixBuffer directly since we are reading from there)
+			for(int j=0;j<2;j++) { weightSumMatrixBuffer[j] = thirdTemp2by1MatrixBuffer[j]; } // store total in weightMatrixBuffer 
 		}
 		// normalize the weight
+			arm_scale_f32(weightSumMatrixBuffer,3,temp2by1MatrixBuffer,2); // 3*weight
+			arm_sub_f32(weightSumMatrixBuffer,temp2by1MatrixBuffer,thirdTemp2by1MatrixBuffer,2); // subtract 3*weight
 			getNorm(thirdTemp2by1MatrixBuffer,2,&norm);
 			arm_scale_f32(thirdTemp2by1MatrixBuffer,(1/norm),weightMatrixBuffer,2);
 	}
