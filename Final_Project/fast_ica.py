@@ -112,8 +112,8 @@ def fast_ica(input_mat, max_num_iterations=1000, epsilon=0.0001):
     # the other one is rotate 90 deg
 
     # initialize a random vector
-    weight = np.mat(np.random.normal(size=(num_comp, 1)))
-
+    # weight = np.mat(np.random.normal(size=(num_comp, 1)))
+    weight = [[1.7],[0.4]]
     # normalize the weight
     weight = weight / np.linalg.norm(weight)
 

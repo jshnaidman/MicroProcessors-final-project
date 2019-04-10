@@ -66,16 +66,13 @@ arm_matrix_instance_f32 meanMatrix;
 float whiteMatrixBuffer[AUDIO_SAMPLE_SIZE];
 arm_matrix_instance_f32 whiteMatrix;
 
-float singleRowMatrixBuffer[AUDIO_SAMPLE_SIZE];
-arm_matrix_instance_f32 singleRowMatrix;
-
-float singleColMatrixBuffer[AUDIO_SAMPLE_SIZE];
+float singleColMatrixBuffer[ROW_SIZE];
 arm_matrix_instance_f32 singleColMatrix;
 
-float singleCol2MatrixBuffer[AUDIO_SAMPLE_SIZE];
+float singleCol2MatrixBuffer[ROW_SIZE];
 arm_matrix_instance_f32 singleCol2Matrix;
 
-float singleCol3MatrixBuffer[AUDIO_SAMPLE_SIZE];
+float singleCol3MatrixBuffer[ROW_SIZE];
 arm_matrix_instance_f32 singleCol3Matrix;
 
 float eigValueMatrixBuffer[4];
@@ -267,7 +264,7 @@ int main(void)
 	HAL_TIM_Base_Start(&htim6);
 	
 	BSP_QSPI_Init();
-	int reload=1;	//set reload to 0 to save time if flash memory is already filled
+	int reload=0;	//set reload to 0 to save time if flash memory is already filled
 
 	if(reload)BSP_QSPI_Erase_Chip(); // this can take like 30 seconds. 
 	
@@ -349,9 +346,9 @@ int main(void)
 	arm_mat_init_f32(&secondTemp2by1Matrix,2,1,secondTemp2by1MatrixBuffer);
 	arm_mat_init_f32(&thirdTemp2by1Matrix,2,1,thirdTemp2by1MatrixBuffer);
 	arm_mat_init_f32(&whiteMatrix,2,ROW_SIZE,whiteMatrixBuffer);
-	arm_mat_init_f32(&singleColMatrix,AUDIO_SAMPLE_SIZE,1,singleColMatrixBuffer); // AUDIO_SAMPLE_SIZE x 1
-	arm_mat_init_f32(&singleCol2Matrix,AUDIO_SAMPLE_SIZE,1,singleCol2MatrixBuffer); // AUDIO_SAMPLE_SIZE x 1
-	arm_mat_init_f32(&singleCol3Matrix,AUDIO_SAMPLE_SIZE,1,singleCol3MatrixBuffer); // AUDIO_SAMPLE_SIZE x 1
+	arm_mat_init_f32(&singleColMatrix,ROW_SIZE,1,singleColMatrixBuffer); // ROW_SIZE x 1
+	arm_mat_init_f32(&singleCol2Matrix,ROW_SIZE,1,singleCol2MatrixBuffer); // ROW_SIZE x 1
+	arm_mat_init_f32(&singleCol3Matrix,ROW_SIZE,1,singleCol3MatrixBuffer); // ROW_SIZE x 1
 	arm_mat_init_f32(&temp2by2Matrix,2,2,temp2by2MatrixBuffer); // 2x2
 	arm_mat_init_f32(&temp2by2TwoMatrix,2,2,temp2by2TwoMatrixBuffer); // 2x2
 	arm_mat_init_f32(&tempCby2Matrix,ROW_SIZE,2,tempCby2MatrixBuffer); // 2x2
@@ -399,9 +396,10 @@ int main(void)
 	
 	float norm;
 	
-	temp2by1MatrixBuffer[0] = (rand()%100)/100.0; // use modulo 100 so that the integer isn't too large which can make computation lengthy
-	temp2by1MatrixBuffer[1] = (rand()%100)/100.0; // use modulo 100 so that the integer isn't too large which can make computation lengthy
-	
+//	temp2by1MatrixBuffer[0] = (rand()%100)/100.0; // use modulo 100 so that the integer isn't too large which can make computation lengthy
+//	temp2by1MatrixBuffer[1] = (rand()%100)/100.0; // use modulo 100 so that the integer isn't too large which can make computation lengthy
+	temp2by1MatrixBuffer[0] = 1.7;
+	temp2by1MatrixBuffer[1] = 0.4;
 	getNorm(temp2by1MatrixBuffer,2,&norm);
 	arm_mat_scale_f32(&temp2by1Matrix,(1/norm),&weightMatrix); // normalize the weight matrix
 	weightOldMatrixBuffer[0] = 0; //init oldWeight to 0
@@ -437,16 +435,15 @@ int main(void)
 			arm_mat_sub_f32(&matrix,&meanMatrix,&matrix2); // centralize matrix, matrix2=center_mat' (need to store in temp because we can't write where we read from)
 			arm_mat_trans_f32(&matrix2,&transposeMatrix); // need to take transpose so that it's the same dimensions as jerry's
 			arm_mat_mult_f32(&whiteningMatrix,&transposeMatrix,&whiteMatrix); // 2 x C
-			arm_mat_trans_f32(&whiteMatrix,&transposeMatrix); // 2 x C
-			arm_mat_mult_f32(&transposeMatrix,&weightMatrix,&singleColMatrix); // white_mat * weight ~ Nx1
+			arm_mat_trans_f32(&whiteMatrix,&tempCby2Matrix); // C x 2
+			arm_mat_mult_f32(&tempCby2Matrix,&weightMatrix,&singleColMatrix); // white_mat * weight ~ Nx1
 			
 			// take result to the third power
 			arm_mult_f32(singleColMatrixBuffer,singleColMatrixBuffer,singleCol2MatrixBuffer, AUDIO_SAMPLE_SIZE);
 			arm_mult_f32(singleColMatrixBuffer,singleCol2MatrixBuffer,singleCol3MatrixBuffer, AUDIO_SAMPLE_SIZE);
 			
 			// transpose is first argument because we store it in memory as "transpose" already
-			arm_mat_trans_f32(&whiteMatrix,&transposeMatrix); // 2 x C
-			arm_mat_mult_f32(&transposeMatrix,&singleCol3Matrix, &temp2by1Matrix); // 2xC * Cx1 ~ 2x1
+			arm_mat_mult_f32(&whiteMatrix,&singleCol3Matrix, &temp2by1Matrix); // 2xC * Cx1 ~ 2x1
 			
 			arm_scale_f32(temp2by1MatrixBuffer,ONE_OVER_TOTAL_SAMPLE_SIZE,secondTemp2by1MatrixBuffer,2); // divide by num_samples
 			arm_scale_f32(weightMatrixBuffer,3,temp2by1MatrixBuffer,2); // 3*weight
