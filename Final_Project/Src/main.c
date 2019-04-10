@@ -57,8 +57,7 @@ arm_matrix_instance_f32 transposeMatrix;
 float tempCby2MatrixBuffer[AUDIO_SAMPLE_SIZE];
 arm_matrix_instance_f32 tempCby2Matrix;
 
-float tempCby2TwoMatrixBuffer[AUDIO_SAMPLE_SIZE];
-arm_matrix_instance_f32 tempCby2TwoMatrix;
+
 
 float meanMatrixBuffer[AUDIO_SAMPLE_SIZE];
 arm_matrix_instance_f32 meanMatrix;
@@ -68,6 +67,7 @@ arm_matrix_instance_f32 whiteMatrix;
 
 float singleColMatrixBuffer[ROW_SIZE];
 arm_matrix_instance_f32 singleColMatrix;
+
 
 float singleCol2MatrixBuffer[ROW_SIZE];
 arm_matrix_instance_f32 singleCol2Matrix;
@@ -151,7 +151,7 @@ TIM_HandleTypeDef htim6;
 /* USER CODE BEGIN PV */
 
 #define MAX(a,b) (((a)>(b))?(a):(b))
-#define EPSILON 0.001
+#define EPSILON 0.0001
 
 /* USER CODE END PV */
 
@@ -281,7 +281,7 @@ int main(void)
 	
 	// create mixed signal and transfer over to flash
 	if(reload)
-	for(i=0;i<AUDIO_FOUR_SECONDS;i++) {									
+	for(i=0;i<32000;i++) {									
 		if (!((i+1)%(ROW_SIZE))) {
 			BSP_QSPI_Write((uint8_t*) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // write 2000 bytes at a time
 			flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
@@ -355,7 +355,6 @@ int main(void)
 	arm_mat_init_f32(&temp2by2Matrix,2,2,temp2by2MatrixBuffer); // 2x2
 	arm_mat_init_f32(&temp2by2TwoMatrix,2,2,temp2by2TwoMatrixBuffer); // 2x2
 	arm_mat_init_f32(&tempCby2Matrix,ROW_SIZE,2,tempCby2MatrixBuffer); // 2x2
-	arm_mat_init_f32(&tempCby2TwoMatrix,ROW_SIZE,2,tempCby2TwoMatrixBuffer); // 2x2
 	arm_mat_init_f32(&icaFilterMatrix,2,2,icaFilterMatrixBuffer); // 2x2
 	
 	flashAddr = 0; // reset the read addr from flash
@@ -431,9 +430,10 @@ int main(void)
 		
 		flashAddr=0;
 		// update the weight chunk by chunk
-		while (flashAddr < AUDIO_STORAGE_SIZE) {
-			BSP_QSPI_Read( (uint8_t *) matrixBuffer, flashAddr, AUDIO_SAMPLE_SIZE_FLOAT);
-			flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
+		while (flashAddr < 256000) {
+			BSP_QSPI_Read( (uint8_t *) matrixBuffer, flashAddr, 8000);
+			flashAddr += 8000;
+			
 			// white_mat = center_mat' * whitening_mat
 			// in the case that DMA finishes before calculations are all done, never use "matrix" after we have matrix2, which is the centralized matrix
 			arm_mat_sub_f32(&matrix,&meanMatrix,&matrix2); // centralize matrix, matrix2=center_mat' (need to store in temp because we can't write where we read from)
@@ -441,10 +441,12 @@ int main(void)
 			arm_mat_mult_f32(&whiteningMatrix,&transposeMatrix,&whiteMatrix); // 2 x C
 			arm_mat_trans_f32(&whiteMatrix,&tempCby2Matrix); // C x 2
 			arm_mat_mult_f32(&tempCby2Matrix,&weightMatrix,&singleColMatrix); // white_mat.T * weight ~ Nx1
-			
+			arm_mat_mult_f32(&tempCby2Matrix,&weightMatrix,&singleCol3Matrix);
 			// take result to the third power
-			arm_mult_f32(singleColMatrixBuffer,singleColMatrixBuffer,singleCol2MatrixBuffer, AUDIO_SAMPLE_SIZE);
-			arm_mult_f32(singleColMatrixBuffer,singleCol2MatrixBuffer,singleCol3MatrixBuffer, AUDIO_SAMPLE_SIZE);
+			arm_mult_f32(singleCol3MatrixBuffer,singleColMatrixBuffer,singleCol2MatrixBuffer, 1000);
+			arm_mult_f32(singleColMatrixBuffer,singleCol2MatrixBuffer,singleCol3MatrixBuffer, 1000);
+
+
 			
 			arm_mat_mult_f32(&whiteMatrix,&singleCol3Matrix, &temp2by1Matrix); // 2xC * Cx1 ~ 2x1
 			
@@ -453,7 +455,7 @@ int main(void)
 			for(int j=0;j<2;j++) { weightSumMatrixBuffer[j] = thirdTemp2by1MatrixBuffer[j]; } // store total in weightMatrixBuffer 
 		}
 		// normalize the weight
-			arm_scale_f32(weightSumMatrixBuffer,3,temp2by1MatrixBuffer,2); // 3*weight
+			arm_scale_f32(weightMatrixBuffer,3,temp2by1MatrixBuffer,2); // 3*weight
 			arm_sub_f32(weightSumMatrixBuffer,temp2by1MatrixBuffer,thirdTemp2by1MatrixBuffer,2); // subtract 3*weight
 			getNorm(thirdTemp2by1MatrixBuffer,2,&norm);
 			arm_scale_f32(thirdTemp2by1MatrixBuffer,(1/norm),weightMatrixBuffer,2);
@@ -471,8 +473,11 @@ int main(void)
 	BSP_QSPI_Read((uint8_t *) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // read next 2000 samples
 	flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
 	// start DMA transfer to DAC
-	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1,(uint32_t*)audioBufferLeft,AUDIO_SAMPLE_SIZE, DAC_ALIGN_12B_R);
-	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2,(uint32_t*)audioBufferRight,AUDIO_SAMPLE_SIZE, DAC_ALIGN_12B_R);
+
+
+	
+	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1,(uint32_t*)audioBufferLeft,1000, DAC_ALIGN_12B_R);
+	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2,(uint32_t*)audioBufferRight,1000, DAC_ALIGN_12B_R);
 	
 	// max value recorded needs to be adjusted by offset that will be applied later to normalize it
 	maxVal1 -= minVal1;

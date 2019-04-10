@@ -334,7 +334,7 @@ void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
 		for (i=0;i<ROW_SIZE;i++) {
 			singleColMatrixBuffer[i] -= minVal1;
 			singleColMatrixBuffer[i] *= (4095/maxVal1);
-			singleColMatrixBuffer[i] = singleColMatrixBuffer[i];
+			audioBufferLeft[i] = singleColMatrixBuffer[i];
 		}
 		for (i=ROW_SIZE;i<AUDIO_SAMPLE_SIZE;i++) {
 			singleColMatrixBuffer[i] -= minVal2;
