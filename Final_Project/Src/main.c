@@ -281,18 +281,18 @@ int main(void)
 	
 	// create mixed signal and transfer over to flash
 	if(reload)
-	for(i=0;i<AUDIO_FOUR_SECONDS;i+=2) {														
+	for(i=0;i<AUDIO_FOUR_SECONDS;i++) {									
+		if (!((i+1)%(ROW_SIZE))) {
+			BSP_QSPI_Write((uint8_t*) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // write 2000 bytes at a time
+			flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
+		}		
 		// 400 and 700 hz frequency spread over 16000 samples per second for two seconds
 		angle1 = TWO_PI_DIVIDED_BY_16000*((400*i)%16000);
 		angle2 = TWO_PI_DIVIDED_BY_16000*((700*i)%16000);
 		sinOne = arm_sin_f32(angle1); // EVEN FLASH ADDR IS THE FIRST SIGNAL
 		sinTwo = arm_sin_f32(angle2); // ODD FLASH ADDR IS THE SECOND SIGNAL
-		matrixBuffer[i%AUDIO_SAMPLE_SIZE] = (a11*sinOne + a12*sinTwo); // combine and normalize between 0 and 1
-		matrixBuffer[(i+1)%AUDIO_SAMPLE_SIZE] = (a21*sinOne + a22*sinTwo);
-		if (!((i+2)%AUDIO_SAMPLE_SIZE)) {
-			BSP_QSPI_Write((uint8_t*) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // write 4000 bytes at a time
-			flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
-		}
+		matrixBuffer[(2*i)%AUDIO_SAMPLE_SIZE] = (a11*sinOne + a12*sinTwo); // combine and normalize between 0 and 1
+		matrixBuffer[(2*i+1)%AUDIO_SAMPLE_SIZE] = (a21*sinOne + a22*sinTwo);
 	}
 	
 	// this is here to demonstrate that buffers are cleared and it is really reading from flash

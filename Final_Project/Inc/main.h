@@ -52,18 +52,18 @@ extern "C" {
 
 #define AUDIO_SAMPLE_SIZE 2000 //2000 samples
 #define ONE_OVER_TOTAL_SAMPLE_SIZE 0.00003125 // 1/32000
-#define AUDIO_SAMPLE_SIZE_SHORT 2*AUDIO_SAMPLE_SIZE // one sample is 2 bytes when converted to 12 bit resolution integer for DAC
-#define AUDIO_SAMPLE_SIZE_FLOAT 4*AUDIO_SAMPLE_SIZE // each sample is 4 bytes when stored as a float
+#define AUDIO_SAMPLE_SIZE_SHORT 4000 // one sample is 2 bytes when converted to 12 bit resolution integer for DAC
+#define AUDIO_SAMPLE_SIZE_FLOAT 8000 // each sample is 4 bytes when stored as a float
 #define AUDIO_TWO_SECONDS 32000
 #define ONE_OVER_AUDIO_TWO_SECONDS_FLOAT 0.00003125097
-#define AUDIO_FOUR_SECONDS 2*AUDIO_TWO_SECONDS
+#define AUDIO_FOUR_SECONDS 64000
 #define AUDIO_TWO_SECONDS_8BIT 64000 // number of bytes to represent 32000 samples of a 16 bit number
 #define AUDIO_TWO_SECONDS_FLOAT 128000 // number of bytes to represent 32000 samples of a float
 #define AUDIO_STORAGE_SIZE 2*AUDIO_TWO_SECONDS_FLOAT
 #define TWO_PI_DIVIDED_BY_16000 0.00039269908
 
 #define NUMBER_OF_AUDIO_BUFFERS_FOR_4_SECONDS_OF_AUDIO 32 // 64000/AUDIO_SAMPLE_SIZE = 32
-#define ROW_SIZE AUDIO_SAMPLE_SIZE/2
+#define ROW_SIZE 1000
 /* USER CODE END EM */
 
 /* Exported functions prototypes ---------------------------------------------*/

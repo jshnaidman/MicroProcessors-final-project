@@ -27,16 +27,14 @@ def main():
     freq1 = 400
     freq2 = 700
 
-    timebase = np.linspace(0, numseconds, numseconds * sample_rate)
-
     # s_1 = np.sin(2 * np.pi * freq1 * timebase)  # signal 1 : sinusoidal signal
     # s_2 = np.sin(2 * np.pi * freq2 * timebase)  # signal 1 : sinusoidal signal
     s_1 = []
     s_2 = []
 
     for i in range(32000):
-        angle1 = (2*np.pi*(400*i)%16000)
-        angle2 = (2*np.pi*(700*i)%16000)
+        angle1 = (((2*np.pi)/16000)*((400*i)%16000))
+        angle2 = (((2*np.pi)/16000)*((700*i)%16000))
         s_1.append(np.sin(angle1))
         s_2.append(np.sin(angle2))
 
