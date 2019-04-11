@@ -332,17 +332,22 @@ void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
 		int i;
 		BSP_QSPI_Read( (uint8_t *) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // read next 2000 samples
 		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
+		if (flashAddr >= AUDIO_STORAGE_SIZE) {
+			flashAddr = 0;
+		}
 		arm_mat_trans_f32(&matrix, &transposeMatrix); // fills transposeMatrix with transpose of matrix. Need to do this because stored as transpose in memory
 		arm_mat_mult_f32(&icaFilterMatrix,&transposeMatrix,&whiteMatrix); // store result of filtering in meanMatrix which is 2xROW_SIZE
 		// store signal as 0-4095 in DAC buffer
 		for (i=0;i<ROW_SIZE;i++) {
 			whiteMatrixBuffer[i] -= minVal1;
-			// meanMatrixBuffer is being reused as a temporary buffer since the mean no longer needs to be calculated
+			// whiteMatrixBuffer is being reused as a temporary buffer since the mean no longer needs to be calculated
+			// We scale to 3500 so it's not too loud
 			audioBufferLeft[i] = (uint16_t) (whiteMatrixBuffer[i]*(3500/maxVal1));
 		}
 		for (i=ROW_SIZE;i<AUDIO_SAMPLE_SIZE;i++) {
 			whiteMatrixBuffer[i] -= minVal2;
-			// meanMatrixBuffer is being reused as a temporary buffer since the mean no longer needs to be calculated
+			// We scale to 3500 so it's not too loud
+			// whiteMatrixBuffer is being reused as a temporary buffer since the mean no longer needs to be calculated
 			audioBufferRight[i%1000] = (uint16_t) (whiteMatrixBuffer[i]*(3500/maxVal2));
 		}
 }

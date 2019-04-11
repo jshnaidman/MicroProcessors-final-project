@@ -151,7 +151,7 @@ TIM_HandleTypeDef htim6;
 /* USER CODE BEGIN PV */
 
 #define MAX(a,b) (((a)>(b))?(a):(b))
-#define EPSILON 0.0001
+#define EPSILON 0.00000001
 
 /* USER CODE END PV */
 
@@ -268,7 +268,7 @@ int main(void)
 	HAL_TIM_Base_Start(&htim6);
 	
 	BSP_QSPI_Init();
-	int reload=1;	//set reload to 0 to save time if flash memory is already filled
+	int reload=0;	//set reload to 0 to save time if flash memory is already filled
 
 	if(reload)BSP_QSPI_Erase_Chip(); // this can take like 30 seconds. 
 	
@@ -389,10 +389,9 @@ int main(void)
 	
 	float norm;
 	
-//	temp2by1MatrixBuffer[0] = (rand()%100)/100.0; // use modulo 100 so that the integer isn't too large which can make computation lengthy
-//	temp2by1MatrixBuffer[1] = (rand()%100)/100.0; // use modulo 100 so that the integer isn't too large which can make computation lengthy
-	temp2by1MatrixBuffer[0] = 1.7;
-	temp2by1MatrixBuffer[1] = 0.4;
+	
+  temp2by1MatrixBuffer[0] = 0.8; // use small values for initial weight
+  temp2by1MatrixBuffer[1] = 1.3;
 	getNorm(temp2by1MatrixBuffer,2,&norm);
 	arm_mat_scale_f32(&temp2by1Matrix,(1/norm),&weightMatrix); // normalize the weight matrix
 	weightOldMatrixBuffer[0] = 0; //init oldWeight to 0
@@ -506,10 +505,6 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-		
-		if (flashAddr >= AUDIO_STORAGE_SIZE) {
-			flashAddr = 0;
-		}
 		
 		
     /* USER CODE BEGIN 3 */
