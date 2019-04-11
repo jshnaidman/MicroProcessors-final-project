@@ -49,6 +49,13 @@ extern float minVal1;
 extern float maxVal2;
 extern float minVal2;
 
+extern float mixedMaxVal1;
+extern float mixedMinVal1;
+extern float mixedMaxVal2;
+extern float mixedMinVal2;
+
+extern int ica_flag;
+
 extern uint16_t audioBufferLeft[];
 extern uint16_t audioBufferRight[];
 extern float matrixBuffer[];
@@ -330,25 +337,44 @@ void QUADSPI_IRQHandler(void)
 
 void HAL_DAC_ConvCpltCallbackCh1(DAC_HandleTypeDef * hdac) {
 		int i;
-		BSP_QSPI_Read( (uint8_t *) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // read next 2000 samples
-		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
-		if (flashAddr >= AUDIO_STORAGE_SIZE) {
-			flashAddr = 0;
+		if (ica_flag) {
+			BSP_QSPI_Read( (uint8_t *) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // read next 2000 samples
+			flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
+			if (flashAddr >= AUDIO_STORAGE_SIZE) {
+				flashAddr = 0;
+			}
+			arm_mat_trans_f32(&matrix, &transposeMatrix); // fills transposeMatrix with transpose of matrix. Need to do this because stored as transpose in memory
+			arm_mat_mult_f32(&icaFilterMatrix,&transposeMatrix,&whiteMatrix); // store result of filtering in meanMatrix which is 2xROW_SIZE
+			// store signal as 0-4095 in DAC buffer
+			for (i=0;i<ROW_SIZE;i++) {
+				whiteMatrixBuffer[i] -= minVal1;
+				// whiteMatrixBuffer is being reused as a temporary buffer since the mean no longer needs to be calculated
+				// We scale to 3500 so it's not too loud
+				audioBufferLeft[i] = (uint16_t) (whiteMatrixBuffer[i]*(3500/maxVal1));
+			}
+			for (i=ROW_SIZE;i<AUDIO_SAMPLE_SIZE;i++) {
+				whiteMatrixBuffer[i] -= minVal2;
+				// We scale to 3500 so it's not too loud
+				// whiteMatrixBuffer is being reused as a temporary buffer since the mean no longer needs to be calculated
+				audioBufferRight[i%1000] = (uint16_t) (whiteMatrixBuffer[i]*(3500/maxVal2));
+			}
 		}
-		arm_mat_trans_f32(&matrix, &transposeMatrix); // fills transposeMatrix with transpose of matrix. Need to do this because stored as transpose in memory
-		arm_mat_mult_f32(&icaFilterMatrix,&transposeMatrix,&whiteMatrix); // store result of filtering in meanMatrix which is 2xROW_SIZE
-		// store signal as 0-4095 in DAC buffer
-		for (i=0;i<ROW_SIZE;i++) {
-			whiteMatrixBuffer[i] -= minVal1;
-			// whiteMatrixBuffer is being reused as a temporary buffer since the mean no longer needs to be calculated
-			// We scale to 3500 so it's not too loud
-			audioBufferLeft[i] = (uint16_t) (whiteMatrixBuffer[i]*(3500/maxVal1));
-		}
-		for (i=ROW_SIZE;i<AUDIO_SAMPLE_SIZE;i++) {
-			whiteMatrixBuffer[i] -= minVal2;
-			// We scale to 3500 so it's not too loud
-			// whiteMatrixBuffer is being reused as a temporary buffer since the mean no longer needs to be calculated
-			audioBufferRight[i%1000] = (uint16_t) (whiteMatrixBuffer[i]*(3500/maxVal2));
+		else {
+			BSP_QSPI_Read( (uint8_t *) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // read next 2000 samples
+			flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
+			if (flashAddr >= AUDIO_STORAGE_SIZE) {
+				flashAddr = 0;
+			}
+			for (i=0;i<AUDIO_SAMPLE_SIZE;i++) {
+				if (i%2) {
+					matrixBuffer[2*i] -= mixedMinVal1;
+					audioBufferLeft[i%1000] = (uint16_t) (matrixBuffer[i]*(3500/mixedMaxVal1));
+				}
+				else {
+					matrixBuffer[i] -= mixedMinVal2;
+					audioBufferRight[i%1000] = (uint16_t) (matrixBuffer[i]*(3500/mixedMaxVal2));
+				}
+			}
 		}
 }
 
