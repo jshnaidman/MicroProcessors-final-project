@@ -40,8 +40,8 @@
 int i;
 
 //buffers
-uint16_t audioBufferLeft[AUDIO_SAMPLE_SIZE];
-uint16_t audioBufferRight[AUDIO_SAMPLE_SIZE];
+uint16_t audioBufferLeft[1000];
+uint16_t audioBufferRight[1000];
 
 // ############
 // matrices
@@ -483,7 +483,7 @@ int main(void)
 	maxVal1 -= minVal1;
 	maxVal2 -= minVal2;
 	
-	// change dimensions of temp2 matrix for DAC output
+	// change dimensions of singleColMatrix matrix for DAC output
 	arm_mat_init_f32(&singleColMatrix, 2, ROW_SIZE, singleColMatrixBuffer);
 
   /* USER CODE END 2 */
