@@ -193,6 +193,7 @@ void calculateEigen() {
 	float tr2 = tr*tr;
 	float det = a*d - b*c;
 	
+	// find the roots of the matrix
 	float root;
 	arm_sqrt_f32(tr2 - 4*det,&root);
 	
@@ -267,7 +268,7 @@ int main(void)
 	HAL_TIM_Base_Start(&htim6);
 	
 	BSP_QSPI_Init();
-	int reload=0;	//set reload to 0 to save time if flash memory is already filled
+	int reload=1;	//set reload to 0 to save time if flash memory is already filled
 
 	if(reload)BSP_QSPI_Erase_Chip(); // this can take like 30 seconds. 
 	
@@ -304,11 +305,11 @@ int main(void)
 	flashAddr = 0;
 	
 	// get the mean
-	// since we are using DMA, there's no point using CMSIS since we're bottlenecked by the speed of reading from flash
 	while (flashAddr < AUDIO_STORAGE_SIZE) {
 		BSP_QSPI_Read((uint8_t *) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT);
 		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
-		for(int j=0;j<AUDIO_SAMPLE_SIZE;j++) {
+		
+	for(int j=0;j<AUDIO_SAMPLE_SIZE;j++) {
 			if (j%2) {
 				mu1 += matrixBuffer[j];
 			}
@@ -328,7 +329,7 @@ int main(void)
 		}
 		else {
 			meanMatrixBuffer[i] = mu2;
-		}
+		}	
 	}
 	
 	// IMPORTANT TO KNOW: In flash, it's stored as a 32000x2 matrix, meaning it goes sig1, sig2, sig1, sig2. Every 2 values is a row. This is so that when we read from flash
@@ -362,16 +363,6 @@ int main(void)
 	while (flashAddr < AUDIO_STORAGE_SIZE) {
 		BSP_QSPI_Read((uint8_t *) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); //read 2000 samples
 		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
-		for(i=0;i<AUDIO_SAMPLE_SIZE;i++) {
-			if (i%2) {
-				if(matrixBuffer[i] > maxVal1) maxVal1 = matrixBuffer[i];
-				if(matrixBuffer[i] < minVal1) minVal1 = matrixBuffer[i];
-			}
-			else {
-				if(matrixBuffer[i] > maxVal2) maxVal2 = matrixBuffer[i];
-				if(matrixBuffer[i] < minVal2) minVal2 = matrixBuffer[i];
-			}
-		}
 		// calculate the covariance matrix for this chunk
 		arm_mat_sub_f32(&matrix,&meanMatrix,&tempCby2Matrix); // centralize matrix (need to store in temp because we can't write where we read from)
 		arm_mat_trans_f32(&tempCby2Matrix, &transposeMatrix); // fills transpose matrix with transpose (2xROW_SIZE)
@@ -468,23 +459,45 @@ int main(void)
 	temp2by2MatrixBuffer[2] = -weightMatrixBuffer[1];
 	temp2by2MatrixBuffer[3] = weightMatrixBuffer[0];
 	
+	//store icaFilterMatrix
 	arm_mat_mult_f32(&temp2by2Matrix,&whiteningMatrix,&icaFilterMatrix);
 	
-	BSP_QSPI_Read((uint8_t *) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // read next 2000 samples
-	flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
-	// start DMA transfer to DAC
-
-
+	// change dimensions of whiteMatrix matrix for DAC output
+	arm_mat_init_f32(&whiteMatrix, 2, ROW_SIZE, whiteMatrixBuffer);
 	
-	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1,(uint32_t*)audioBufferLeft,1000, DAC_ALIGN_12B_R);
-	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2,(uint32_t*)audioBufferRight,1000, DAC_ALIGN_12B_R);
-	
-	// max value recorded needs to be adjusted by offset that will be applied later to normalize it
+	flashAddr=0;
+	while (flashAddr < 256000) {
+		BSP_QSPI_Read( (uint8_t *) matrixBuffer,flashAddr,2000); // read next 2000 samples
+		flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
+		arm_mat_trans_f32(&matrix, &transposeMatrix); // fills transposeMatrix with transpose of matrix. Need to do this because stored as transpose in memory
+		arm_mat_mult_f32(&icaFilterMatrix,&transposeMatrix,&whiteMatrix); // store result of filtering in whiteMatrix which is 2xROW_SIZE
+		for(i=0;i<AUDIO_SAMPLE_SIZE;i++) {
+			if (i%2) {
+				if(whiteMatrixBuffer[i] > maxVal1) maxVal1 = whiteMatrixBuffer[i];
+				if(whiteMatrixBuffer[i] < minVal1) minVal1 = whiteMatrixBuffer[i];
+			}
+			else {
+				if(whiteMatrixBuffer[i] > maxVal2) maxVal2 = whiteMatrixBuffer[i];
+				if(whiteMatrixBuffer[i] < minVal2) minVal2 = whiteMatrixBuffer[i];
+			}
+		}
+	}
+	// take off offset from maxVal
 	maxVal1 -= minVal1;
 	maxVal2 -= minVal2;
 	
-	// change dimensions of singleColMatrix matrix for DAC output
-	arm_mat_init_f32(&meanMatrix, 2, ROW_SIZE, meanMatrixBuffer);
+	flashAddr=0;
+	BSP_QSPI_Read((uint8_t *) matrixBuffer,flashAddr,AUDIO_SAMPLE_SIZE_FLOAT); // read next 2000 samples
+	flashAddr += AUDIO_SAMPLE_SIZE_FLOAT;
+
+	// start DMA transfer to DAC
+	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_1,(uint32_t*)audioBufferLeft,1000, DAC_ALIGN_12B_R);
+	HAL_DAC_Start_DMA(&hdac1, DAC_CHANNEL_2,(uint32_t*)audioBufferRight,1000, DAC_ALIGN_12B_R);
+
+	
+	
+	
+	
 
   /* USER CODE END 2 */
 
