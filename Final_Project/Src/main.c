@@ -484,7 +484,7 @@ int main(void)
 	maxVal2 -= minVal2;
 	
 	// change dimensions of singleColMatrix matrix for DAC output
-	arm_mat_init_f32(&singleColMatrix, 2, ROW_SIZE, singleColMatrixBuffer);
+	arm_mat_init_f32(&meanMatrix, 2, ROW_SIZE, meanMatrixBuffer);
 
   /* USER CODE END 2 */
 
